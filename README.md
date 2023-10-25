@@ -1,16 +1,30 @@
 # DAREG backend
 
-## Local build and run
- docker build --progress plain -f Dockerfile --build-arg COMMIT_HASH=hash --build-arg COMMIT_DATE=2023-10-25 -t registry.gitlab.ics.muni.cz:443/ceitec-cf-biodata/dareg:devel --push .
+## Local deployment
 
- docker run -d -p 80:80 --name dareg --rm registry.gitlab.ics.muni.cz:443/ceitec-cf-biodata/dareg:devel
+### Prepare container
 
-## Getting started
+Build the Docker image:
+```
+docker compose build
+```
+
+Run the app:
+```
+docker compose up
+```
+
+It's running. Go to http://localhost in a web-browser.
+
+### Setup application
 
 These commands must be executed when you first run the application. 
+```
+# update database model
+pyma migrate
 
- pyma makemigrations
+# create superuser
+pyma createsuperuser
+```
 
- pyma migrate
-
- pyma createsuperuser
+Now you can login with the new superuser credentials e.g. to Django admin interface (http://localhost/admin).

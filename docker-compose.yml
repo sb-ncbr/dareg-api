@@ -1,0 +1,36 @@
+version: "3.8"
+
+volumes:
+  dareg-postgres15:
+
+services:
+  postgres:
+    image: postgres:15.4
+    volumes:
+      - dareg-postgres15:/var/lib/postgresql/data
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: pass123worD
+      POSTGRES_DB: dareg
+
+  dareg:
+    image: registry.gitlab.ics.muni.cz:443/ceitec-cf-biodata/dareg:devel
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        COMMIT_DATE: "2020-01-01"
+        COMMIT_HASH: "not_set"
+    depends_on:
+      - postgres
+    ports:
+      - 80:80
+    environment:
+      PRODUCTION: "false"
+      DJANGO_DEBUG: true
+      DJANGO_SECRET_KEY: qig2%p#k@kcc!u@+e&ou7@*(a$3!g&5kprv7^k#1q_i7_t5s5r
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: pass123worD
+      DB_NAME: dareg
