@@ -9,6 +9,6 @@ Markdown~=3.5
 Pygments~=2.16.1
 django-filter~=23.3
 django-guardian~=2.4.0
-psycopg-binary~=3.1.12
+psycopg[binary]~=3.1.12
 gunicorn~=21.2.0
 whitenoise~=6.6.0
