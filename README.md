@@ -11,7 +11,11 @@ docker compose build
 
 Run the app:
 ```
-docker compose up
+# run container with app in the background (detached mode)
+docker compose up -d
+
+# follow logs
+docker compose logs -ft
 ```
 
 It's running. Go to http://localhost in a web-browser.
@@ -20,6 +24,9 @@ It's running. Go to http://localhost in a web-browser.
 
 These commands must be executed when you first run the application. 
 ```
+# enter to the container with app
+docker compose exec dareg bash
+
 # update database model
 pyma migrate
 
@@ -27,4 +34,4 @@ pyma migrate
 pyma createsuperuser
 ```
 
-Now you can login with the new superuser credentials e.g. to Django admin interface (http://localhost/admin).
+You can login with the new superuser credentials e.g. to Django admin interface (http://localhost/admin).
