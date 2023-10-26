@@ -9,6 +9,8 @@ services:
     volumes:
       - dareg-postgres15:/var/lib/postgresql/data
     restart: unless-stopped
+    ports:
+      - 5432:5432
     environment:
       POSTGRES_PASSWORD: pass123worD
       POSTGRES_DB: dareg
@@ -24,7 +26,9 @@ services:
     depends_on:
       - postgres
     ports:
-      - 80:80
+      - 8083:80
+    volumes:
+      - /home/adrian/work/DAREG/backend/dareg/:/srv/dareg
     environment:
       PRODUCTION: "false"
       DJANGO_DEBUG: true
@@ -34,3 +38,13 @@ services:
       DB_USER: postgres
       DB_PASSWORD: pass123worD
       DB_NAME: dareg
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - 8084:8080
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      
