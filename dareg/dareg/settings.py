@@ -34,12 +34,12 @@ ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
+    "mozilla_django_oidc",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "mozilla_django_oidc",
     "debug_toolbar",
     "api",
 ]
@@ -133,14 +133,36 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Mozilla Django OIDC
+AUTHENTICATION_BACKENDS = ("api.backends.DAREG_OIDCAuthenticationBackend",)
+
+OIDC_OP_AUTHORIZATION_ENDPOINT = os.environ["OIDC_AUTHORIZATION_ENDPOINT"]
+OIDC_OP_TOKEN_ENDPOINT = os.environ["OIDC_TOKEN_ENDPOINT"]
+OIDC_OP_USER_ENDPOINT = os.environ["OIDC_USER_ENDPOINT"]
+OIDC_OP_JWKS_ENDPOINT = os.environ["OIDC_JWKS_ENDPOINT"]
+OIDC_RP_SIGN_ALGO = "RS256"
+OIDC_RP_CLIENT_ID = os.environ["OIDC_CLIENT_ID"]
+OIDC_RP_CLIENT_SECRET = os.environ["OIDC_CLIENT_SECRET"]
+OIDC_RP_SCOPES = "openid email profile eduperson_entitlement"
+OIDC_ALLOWED_EDUPERSON_ENTITLEMENT = os.environ["OIDC_ALLOWED_EDUPERSON_ENTITLEMENT"]
+
+# used by @login_required and @permission_required decorators
+LOGIN_URL = "/oidc/authenticate"
+# Values of following variables are named URL patterns from urls.py
+LOGIN_REDIRECT_URL = ""
+LOGOUT_REDIRECT_URL = os.environ["OIDC_LOGOUT_REDIRECT_URL"]
+
 # Django REST framework
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "mozilla_django_oidc.contrib.drf.OIDCAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",
-        #"mozilla_django_oidc.contrib.drf.OIDCAuthentication",
-    ]
+    ],
 }
 
 # Django Debug Toolbar

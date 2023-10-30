@@ -38,6 +38,14 @@ services:
       DB_USER: postgres
       DB_PASSWORD: pass123worD
       DB_NAME: dareg
+      OIDC_AUTHORIZATION_ENDPOINT: https://oidc.muni.cz/oidc/auth/authorize
+      OIDC_TOKEN_ENDPOINT: https://oidc.muni.cz/oidc/token
+      OIDC_USER_ENDPOINT: https://oidc.muni.cz/oidc/userinfo
+      OIDC_JWKS_ENDPOINT: https://oidc.muni.cz/oidc/jwk
+      OIDC_CLIENT_ID: 
+      OIDC_CLIENT_SECRET: 
+      OIDC_ALLOWED_EDUPERSON_ENTITLEMENT: None
+      OIDC_LOGOUT_REDIRECT_URL: https://oidc.muni.cz/oidc/endsession
   adminer:
     image: adminer
     restart: unless-stopped
