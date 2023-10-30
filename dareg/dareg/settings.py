@@ -135,7 +135,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Mozilla Django OIDC
-AUTHENTICATION_BACKENDS = ("api.backends.DAREG_OIDCAuthenticationBackend",)
+AUTHENTICATION_BACKENDS = (
+    "api.backends.DAREG_OIDCAuthenticationBackend",
+    "django.contrib.auth.backends.ModelBackend",
+)
 
 OIDC_OP_AUTHORIZATION_ENDPOINT = os.environ["OIDC_AUTHORIZATION_ENDPOINT"]
 OIDC_OP_TOKEN_ENDPOINT = os.environ["OIDC_TOKEN_ENDPOINT"]
