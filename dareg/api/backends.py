@@ -4,6 +4,7 @@ from django.conf import settings
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from .models import UserProfile
 
+
 class DAREG_OIDCAuthenticationBackend(OIDCAuthenticationBackend):
     @staticmethod
     def is_sub(sub):
@@ -46,7 +47,7 @@ class DAREG_OIDCAuthenticationBackend(OIDCAuthenticationBackend):
             return False
 
         # check if access group is defined
-        if settings.OIDC_ALLOWED_EDUPERSON_ENTITLEMENT.lower() != "none":
+        if settings.OIDC_ALLOWED_EDUPERSON_ENTITLEMENT.lower() == "none":
             return True
         else:
             # user has to be a member of access group
@@ -108,7 +109,7 @@ class DAREG_OIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user.save()
         try:
             user_profile = UserProfile.objects.get(user=user)
-            user_profile.full_name = claims.get("full_name", "")
+            user_profile.full_name = claims.get("name", "")
             user_profile.save()
         except UserProfile.DoesNotExist:
             print("login - UserProfile can't be updated (%s)" % user.username)
