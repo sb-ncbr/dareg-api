@@ -28,7 +28,7 @@ services:
     ports:
       - 8083:80
     volumes:
-      - /home/adrian/work/DAREG/backend/dareg/:/srv/dareg
+      - ./dareg/:/srv/dareg
     environment:
       PRODUCTION: "false"
       DJANGO_DEBUG: true
@@ -47,4 +47,3 @@ services:
       - postgres
     environment:
       ADMINER_DEFAULT_SERVER: postgres
-      
