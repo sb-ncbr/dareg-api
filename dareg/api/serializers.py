@@ -25,7 +25,7 @@ class ProjectSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Project
         fields = "__all__"
-        
+
 
 class TemplateSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:

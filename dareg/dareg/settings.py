@@ -192,27 +192,30 @@ STORAGES = {
 # Logging
 if DEBUG:
     import logging.config
+
     LOGGING_CONFIG = None
-    logging.config.dictConfig({
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'console': {
-                # exact format is not important, this is the minimum information
-                'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+    logging.config.dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "console": {
+                    # exact format is not important, this is the minimum information
+                    "format": "%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
+                },
             },
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'console',
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "console",
+                },
             },
-        },
-        'loggers': {
-        # root logger
-            '': {
-                'level': 'DEBUG',
-                'handlers': ['console'],
+            "loggers": {
+                # root logger
+                "": {
+                    "level": "DEBUG",
+                    "handlers": ["console"],
+                },
             },
-        },
-    })
+        }
+    )

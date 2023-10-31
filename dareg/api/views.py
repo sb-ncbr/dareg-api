@@ -8,7 +8,7 @@ from .serializers import (
     FacilitySerializer,
     ProjectSerializer,
     DatasetSerializer,
-    TemplateSerializer
+    TemplateSerializer,
 )
 
 
@@ -20,7 +20,6 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by("-date_joined")
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
 
 
 class GroupViewSet(viewsets.ModelViewSet):
@@ -42,10 +41,12 @@ class FacilityViewSet(viewsets.ModelViewSet):
     serializer_class = FacilitySerializer
     permission_classes = [permissions.IsAuthenticated]
 
+
 class TemplateViewSet(viewsets.ModelViewSet):
     queryset = Template.objects.all()
     serializer_class = TemplateSerializer
     permission_classes = [permissions.IsAuthenticated]
+
 
 class ProjectViewSet(viewsets.ModelViewSet):
     """
