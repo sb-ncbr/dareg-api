@@ -31,8 +31,8 @@ services:
       - ./dareg/:/srv/dareg
     environment:
       PRODUCTION: "false"
-      DJANGO_DEBUG: true
-      DJANGO_SECRET_KEY: qig2%p#k@kcc!u@+e&ou7@*(a$3!g&5kprv7^k#1q_i7_t5s5r
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: "qig2%p#k@kcc!u@+e&ou7@*(a$3!g&5kprv7^k#1q_i7_t5s5r"
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
