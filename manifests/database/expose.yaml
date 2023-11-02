@@ -1,0 +1,30 @@
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: dareg-database-cluster-lb-ro
+#   annotations:
+#     metallb.universe.tf/address-pool: privmuni
+#     metallb.universe.tf/allow-shared-ip: "dareg-database-cluster-lb-058ea9a2-0d28-4377-b6e1-26b3f06dd41e"
+# spec:
+#   type: LoadBalancer
+#   ports:
+#   - port: 5433
+#     targetPort: 5432
+#   selector:
+#     postgresql: dareg-database-cluster
+#     role: replica
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dareg-database-cluster-lb-rw
+  annotations:
+    metallb.universe.tf/allow-shared-ip: "dareg-database-cluster-lb-058ea9a2-0d28-4377-b6e1-26b3f06dd41e"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    postgresql: dareg-database-cluster
+    role: primary

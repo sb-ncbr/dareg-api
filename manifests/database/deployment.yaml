@@ -1,0 +1,35 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: dareg-database-cluster
+spec:
+  instances: 3
+
+  imageName: 'ghcr.io/cloudnative-pg/postgresql:15'
+
+  primaryUpdateStrategy: unsupervised
+
+  bootstrap:
+    initdb:
+      database: dareg-database
+      owner: dareg-db-admin
+
+  postgresql:
+    parameters:
+      wal_keep_size: 64GB
+
+  replicationSlots:
+    highAvailability:
+      enabled: true
+
+  resources:
+    requests:
+      memory: "4096Mi"
+      cpu: 1
+    limits:
+      memory: "4096Mi"
+      cpu: 1
+
+  storage:
+    size: 100Gi
+    storageClass: zfs-csi
