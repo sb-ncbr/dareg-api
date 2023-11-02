@@ -1,0 +1,61 @@
+version: "3.8"
+
+volumes:
+  dareg-postgres15:
+
+services:
+  postgres:
+    image: postgres:15.4
+    volumes:
+      - dareg-postgres15:/var/lib/postgresql/data
+    restart: unless-stopped
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: pass123worD
+      POSTGRES_DB: dareg
+
+  dareg:
+    image: registry.gitlab.ics.muni.cz:443/ceitec-cf-biodata/dareg:devel
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        COMMIT_DATE: "2020-01-01"
+        COMMIT_HASH: "not_set"
+    depends_on:
+      - postgres
+    ports:
+      - 8083:80
+    volumes:
+      - ./dareg/:/srv/dareg
+    environment:
+      # In production mode requests are served by Gunicorn webserver
+      PRODUCTION: false
+      DJANGO_DEBUG: true
+      # List of allowed hosts separated by spaces (e.g.: "localhost domain.xyz 10.0.0.1")
+      # If set to "*" all hosts are allowed
+      DJANGO_ALLOWED_HOSTS: "*"
+      DJANGO_SECRET_KEY: "qig2%p#k@kcc!u@+e&ou7@*(a$3!g&5kprv7^k#1q_i7_t5s5r"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: pass123worD
+      DB_NAME: dareg
+      OIDC_AUTHORIZATION_ENDPOINT: https://oidc.muni.cz/oidc/auth/authorize
+      OIDC_TOKEN_ENDPOINT: https://oidc.muni.cz/oidc/token
+      OIDC_USER_ENDPOINT: https://oidc.muni.cz/oidc/userinfo
+      OIDC_JWKS_ENDPOINT: https://oidc.muni.cz/oidc/jwk
+      OIDC_CLIENT_ID: 
+      OIDC_CLIENT_SECRET: 
+      OIDC_ALLOWED_EDUPERSON_ENTITLEMENT: None
+      OIDC_LOGOUT_REDIRECT_URL: https://oidc.muni.cz/oidc/endsession
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - 8084:8080
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
