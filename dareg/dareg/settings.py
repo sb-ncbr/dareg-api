@@ -40,11 +40,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "debug_toolbar",
+    "corsheaders",
+    "django_filters",
     "api",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -166,6 +169,10 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly",
     ],
+    # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_PAGINATION_CLASS": "api.backends.CustomPagination",
+    "PAGE_SIZE": 100,
 }
 
 # Django Debug Toolbar
@@ -218,3 +225,7 @@ if DEBUG:
             },
         }
     )
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5000",
+]

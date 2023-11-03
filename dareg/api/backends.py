@@ -1,8 +1,11 @@
 import re
+from urllib import response
 from django.contrib.auth.models import User
+from rest_framework import pagination
 from django.conf import settings
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from .models import UserProfile
+from rest_framework.response import Response
 
 
 class DAREG_OIDCAuthenticationBackend(OIDCAuthenticationBackend):
@@ -29,6 +32,8 @@ class DAREG_OIDCAuthenticationBackend(OIDCAuthenticationBackend):
         if not verified:
             print("login failed, OIDC claims not verified")
             return False
+
+        return True
 
         # test if all OIDC claims are present
         if (
@@ -115,3 +120,17 @@ class DAREG_OIDCAuthenticationBackend(OIDCAuthenticationBackend):
             print("login - UserProfile can't be updated (%s)" % user.username)
 
         return user
+
+
+class CustomPagination(pagination.PageNumberPagination):
+    def get_paginated_response(self, data):
+        return Response(
+            {
+                "links": {
+                    "next": self.get_next_link(),
+                    "previous": self.get_previous_link(),
+                },
+                "count": self.page.paginator.count,
+                "results": data,
+            }
+        )

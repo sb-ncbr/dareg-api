@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Facility, Project, Dataset, Template, FilledTemplate, Language, UserProfile
+from .models import (
+    Facility,
+    Project,
+    Dataset,
+    Template,
+    FilledTemplate,
+    Language,
+    UserProfile,
+)
 
 admin.site.register(Facility)
 admin.site.register(Project)
