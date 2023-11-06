@@ -13,7 +13,7 @@ from django.conf import settings
 # only one given app
 # pyma graph_models api --pydot --arrow-shape normal --color-code-deletions -o dareg.png
 # all apps
-# pyma graph_models api --all-applications --pydot --arrow-shape normal --color-code-deletions -o dareg_full.png
+# pyma graph_models api --all-applications --group-models --pydot --arrow-shape normal --color-code-deletions -o dareg_full.png
 ##
 
 
