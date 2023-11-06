@@ -11,7 +11,7 @@ from django.conf import settings
 # apt update && apt install graphviz
 # pip3 install pydotplus
 # only one given app
-# pyma graph_models api --pydot --arrow-shape normal --color-code-deletions -o dareg.png
+# pyma graph_models api --exclude-models TimeStampedModel --pydot --arrow-shape normal --color-code-deletions -o dareg.png
 # all apps
 # pyma graph_models api --all-applications --group-models --pydot --arrow-shape normal --color-code-deletions -o dareg_full.png
 ##
