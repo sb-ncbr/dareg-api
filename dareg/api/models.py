@@ -3,6 +3,19 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from django.conf import settings
 
+##
+# Steps to generate UML class diagram
+#
+# In running container:
+#
+# apt update && apt install graphviz
+# pip3 install pydotplus
+# only one given app
+# pyma graph_models api --pydot --arrow-shape normal --color-code-deletions -o dareg.png
+# all apps
+# pyma graph_models api --all-applications --pydot --arrow-shape normal --color-code-deletions -o dareg_full.png
+##
+
 
 class Facility(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
