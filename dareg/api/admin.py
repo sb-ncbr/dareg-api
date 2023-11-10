@@ -3,8 +3,8 @@ from .models import (
     Facility,
     Project,
     Dataset,
-    Template,
-    FilledTemplate,
+    Schema,
+    Metadata,
     Language,
     UserProfile,
 )
@@ -12,7 +12,7 @@ from .models import (
 admin.site.register(Facility)
 admin.site.register(Project)
 admin.site.register(Dataset)
-admin.site.register(Template)
-admin.site.register(FilledTemplate)
+admin.site.register(Schema)
+admin.site.register(Metadata)
 admin.site.register(Language)
 admin.site.register(UserProfile)

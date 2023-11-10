@@ -2,15 +2,15 @@ from django.shortcuts import render
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets, permissions
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Facility, Project, Dataset, Template, FilledTemplate
+from .models import Facility, Project, Dataset, Schema, Metadata
 from .serializers import (
     UserSerializer,
     GroupSerializer,
     FacilitySerializer,
     ProjectSerializer,
     DatasetSerializer,
-    TemplateSerializer,
-    FilledTemplateSerializer,
+    SchemaSerializer,
+    MetadataSerializer,
 )
 
 
@@ -44,9 +44,9 @@ class FacilityViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
-class TemplateViewSet(viewsets.ModelViewSet):
-    queryset = Template.objects.all()
-    serializer_class = TemplateSerializer
+class SchemaViewSet(viewsets.ModelViewSet):
+    queryset = Schema.objects.all()
+    serializer_class = SchemaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 
@@ -72,11 +72,11 @@ class DatasetViewSet(viewsets.ModelViewSet):
     filterset_fields = ["project"]
 
 
-class FilledTemplateViewSet(viewsets.ModelViewSet):
+class MetadataViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows filled template to be viewed or edited.
     """
 
-    queryset = FilledTemplate.objects.all()
-    serializer_class = FilledTemplateSerializer
+    queryset = Metadata.objects.all()
+    serializer_class = MetadataSerializer
     permission_classes = [permissions.IsAuthenticated]

@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
-from .models import Facility, FilledTemplate, Project, Dataset, Template
+from .models import Facility, Metadata, Project, Dataset, Schema
 
 
 class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
@@ -37,49 +37,49 @@ class FacilitySerializer(HyperlinkedModelSerializerWithId):
         fields = "__all__"
 
 
-class MinimalTemplateSerializer(MinimalHyperlinkedModelSerialized):
+class MinimalSchemaSerializer(MinimalHyperlinkedModelSerialized):
     class Meta:
-        model = Template
+        model = Schema
         fields = ["id", "name", "url"]
 
 
-class TemplateSerializer(HyperlinkedModelSerializerWithId):
+class SchemaSerializer(HyperlinkedModelSerializerWithId):
     class Meta:
-        model = Template
+        model = Schema
         fields = "__all__"
 
 
-class MinimalFilledTemplateSerializer(MinimalHyperlinkedModelSerialized):
+class MinimalMetadataSerializer(MinimalHyperlinkedModelSerialized):
     class Meta:
-        model = Template
+        model = Schema
         fields = ["id", "url"]
 
 
-class FilledTemplateResponseSerializer(HyperlinkedModelSerializerWithId):
-    template = TemplateSerializer(read_only=True)
+class MetadataResponseSerializer(HyperlinkedModelSerializerWithId):
+    template = SchemaSerializer(read_only=True)
 
     class Meta:
-        model = FilledTemplate
+        model = Metadata
         fields = "__all__"
 
 
-class FilledTemplateSerializer(HyperlinkedModelSerializerWithId):
+class MetadataSerializer(HyperlinkedModelSerializerWithId):
     class Meta:
-        model = FilledTemplate
+        model = Metadata
         fields = "__all__"
 
     def to_representation(self, data):
         """Serialize the facility as a nested object."""
-        return FilledTemplateResponseSerializer(context=self.context).to_representation(
+        return MetadataResponseSerializer(context=self.context).to_representation(
             data
         )
 
 
 class ProjectResponseSerializer(HyperlinkedModelSerializerWithId):
     facility = FacilitySerializer(read_only=True)
-    default_dataset_template = MinimalTemplateSerializer(read_only=True)
-    project_template = MinimalTemplateSerializer(read_only=True)
-    project_filled_template = FilledTemplateSerializer(read_only=True)
+    default_dataset_schema = MinimalSchemaSerializer(read_only=True)
+    project_schema = MinimalSchemaSerializer(read_only=True)
+    project_metadata = MetadataSerializer(read_only=True)
 
     class Meta:
         model = Project
