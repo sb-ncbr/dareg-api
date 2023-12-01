@@ -96,7 +96,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         return ProjectResponseSerializer(context=self.context).to_representation(data)
 
 
-class DatasetSerializer(HyperlinkedModelSerializerWithId):
+class DatasetResponseSerializer(serializers.HyperlinkedModelSerializer):
+    project = MinimalSchemaSerializer(read_only=True)
+    dataset_schema = MinimalSchemaSerializer(read_only=True)
+
     class Meta:
         model = Dataset
         fields = "__all__"
+    
+class DatasetSerializer(HyperlinkedModelSerializerWithId):
+
+    class Meta:
+        model = Dataset
+        fields = "__all__"
+
+    def to_representation(self, data):
+        return DatasetResponseSerializer(context=self.context).to_representation(data)

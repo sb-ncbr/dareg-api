@@ -1,0 +1,215 @@
+[
+    {
+        "fields": {
+            "abbreviation": "CF T1",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CF TEST1"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF CELLIM",
+            "created": "2023-11-12T20:51:38.465Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:51:38.465Z",
+            "modified_by": null,
+            "name": "CORE FACILITY CELLULAR IMAGING"
+        },
+        "model": "api.facility",
+        "pk": "44a9e3b5-cf4d-4c45-b87f-85f36f59458c"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF T3",
+            "created": "2023-11-12T20:54:36.551Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:36.551Z",
+            "modified_by": null,
+            "name": "CF TEST3"
+        },
+        "model": "api.facility",
+        "pk": "cf068b0b-421c-42a5-ba72-5c5d5c9a5516"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF T2",
+            "created": "2023-11-12T20:54:30.556Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:30.556Z",
+            "modified_by": null,
+            "name": "CF TEST2"
+        },
+        "model": "api.facility",
+        "pk": "d615713d-5444-4338-acb6-4bee1960f0f2"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF MAFIL",
+            "created": "2023-11-12T20:54:04.016Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:04.016Z",
+            "modified_by": null,
+            "name": "Core Facility Multimodal and Functional Imaging Laboratory"
+        },
+        "model": "api.facility",
+        "pk": "e8d943e0-5a8c-4998-8895-9d5f167a4fd2"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF BIC",
+            "created": "2023-11-12T20:53:37.716Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:53:37.716Z",
+            "modified_by": null,
+            "name": "Core Facility Biomolecular Interactions and Crystallography"
+        },
+        "model": "api.facility",
+        "pk": "fb6e21bb-f730-4485-bba8-2200c899fbf1"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF T1111",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CF TEST1111"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF T1112",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CF TEST1112"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF T1113",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CF TEST1113"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF T1114",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CF TEST1114"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF BioIT",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CORE FACILITY BIOINFORMATICS"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF BioDATA",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CORE FACILITY BIOLOGICAL DATA MANAGEMENT"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF NANO",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CORE FACILITY NANO"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF BioFot",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CORE FACILITY Biofotonics"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF Plants",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CORE FACILITY PLANTS"
+        },
+        "model": "api.facility"
+    },
+    {
+        "fields": {
+            "abbreviation": "CF NANOBIO",
+            "created": "2023-11-12T20:54:24.420Z",
+            "created_by": null,
+            "deleted": null,
+            "deleted_by": null,
+            "modified": "2023-11-12T20:54:24.420Z",
+            "modified_by": null,
+            "name": "CORE FACILITY NANOBIOTECHNOLOGY"
+        },
+        "model": "api.facility"
+    }
+]
