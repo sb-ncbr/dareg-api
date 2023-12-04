@@ -96,7 +96,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return ProjectResponseSerializer(context=self.context).to_representation(data)
 
 
-class DatasetResponseSerializer(serializers.HyperlinkedModelSerializer):
+class DatasetResponseSerializer(HyperlinkedModelSerializerWithId):
     project = MinimalSchemaSerializer(read_only=True)
     dataset_schema = MinimalSchemaSerializer(read_only=True)
 
