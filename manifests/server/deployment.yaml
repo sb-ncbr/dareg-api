@@ -33,7 +33,7 @@ spec:
               value: ${CI_COMMIT_SHORT_SHA}
           envFrom:
             - secretRef:
-              name: ${APP}-secrets
+                name: ${APP}-secrets
           ports:
           - containerPort: 8080
             name: dareg-api
@@ -90,7 +90,7 @@ spec:
       paths:
         - pathType: ImplementationSpecific
           path: "/"
-          api:
+          backend:
             service:
               name: dareg-api-svc-${APP}
               port: 
@@ -100,7 +100,7 @@ spec:
       paths:
         - pathType: ImplementationSpecific
           path: "/"
-          api:
+          backend:
             service:
               name: dareg-api-svc-${APP}
               port: 

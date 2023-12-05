@@ -11,7 +11,7 @@ RUN pip install -r requirements.txt
 ## Runtime image
 FROM python:3.11-slim AS base
 WORKDIR /srv/dareg
-EXPOSE 80
+EXPOSE 8080
 
 # get python packages
 COPY --from=builder /opt/venv /opt/venv
