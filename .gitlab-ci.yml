@@ -9,7 +9,7 @@ stages:
   - cleanup
 
 variables:
-  DOCKER_IMAGE_NAME: "$HARBOR_URL/xrosinec/dareg-api"
+  DOCKER_IMAGE_NAME: "$HARBOR_URL/ceitec-biodata/dareg-api"
   CLUSTER_DOMAIN: "dyn.cloud.e-infra.cz"
   DEPLOYMENT_TLD: dareg.${CLUSTER_DOMAIN}
   DEPLOYMENT_TLD_FIX: "dareg.biodata.ceitec.cz"
