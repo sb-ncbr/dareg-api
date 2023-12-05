@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    role: dareg-api
+    deployment-id: ${APP}
+  name: dareg-server-${APP}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: dareg-api-${APP}
+  template:
+    metadata:
+      labels:
+        role: dareg-api-${APP}
+    spec:
+      securityContext:
+        runAsGroup: 1000
+        runAsUser: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - image: ${DOCKER_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}
+          imagePullPolicy: Always
+          name: dareg-api
+          env:
+            - name: COMMIT_DATE
+              value: ${CI_COMMIT_TIMESTAMP}
+            - name: COMMIT_HASH
+              value: ${CI_COMMIT_SHORT_SHA}
+          envFrom:
+            - secretRef:
+              name: ${APP}-secrets
+          ports:
+          - containerPort: 8080
+            name: dareg-api
+            protocol: TCP
+          resources:
+            requests:
+              cpu: 0.2
+              memory: "64Mi"
+            limits:
+              cpu: 0.5
+              memory: "128Mi"
+          securityContext:
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL    
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    deployment-id: ${APP}
+  name: dareg-api-svc-${APP}
+spec:
+  selector:
+    role: dareg-api-${APP}
+  type: ClusterIP
+  ports:
+  - name: api-port
+    port: 5000
+    protocol: TCP
+    targetPort: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dareg-api-ingress-${APP}
+  labels:
+    deployment-id: ${APP}
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: nginx
+    kubernetes.io/tls-acme: "true"
+spec:
+  tls:
+  - hosts:
+      - ${APP_HOST}
+      - ${APP_HOST_FIX}
+    secretName: ${APP}-dareg-api-dyn-cloud-e-infra-cz
+  rules:
+  - host: ${APP_HOST}
+    http:
+      paths:
+        - pathType: ImplementationSpecific
+          path: "/"
+          api:
+            service:
+              name: dareg-api-svc-${APP}
+              port: 
+                name: api-port
+  - host: ${APP_HOST_FIX}
+    http:
+      paths:
+        - pathType: ImplementationSpecific
+          path: "/"
+          api:
+            service:
+              name: dareg-api-svc-${APP}
+              port: 
+                name: api-port
