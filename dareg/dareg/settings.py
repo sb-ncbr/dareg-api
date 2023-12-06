@@ -189,6 +189,9 @@ if DEBUG:
     hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
     INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + INTERNAL_IPS
 
+if PRODUCTION:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Use WhiteNoise to serve static files
 STORAGES = {
     "staticfiles": {
