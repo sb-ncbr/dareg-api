@@ -41,10 +41,10 @@ spec:
           resources:
             requests:
               cpu: 0.2
-              memory: "64Mi"
+              memory: "256Mi"
             limits:
               cpu: 0.5
-              memory: "128Mi"
+              memory: "1024Mi"
           securityContext:
             runAsUser: 1000
             allowPrivilegeEscalation: false
@@ -64,9 +64,9 @@ spec:
   type: ClusterIP
   ports:
   - name: api-port
-    port: 5000
+    port: 8080
     protocol: TCP
-    targetPort: 5000
+    targetPort: 8080
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

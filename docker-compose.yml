@@ -26,16 +26,17 @@ services:
     depends_on:
       - postgres
     ports:
-      - 8083:80
+      - 8083:8080
     volumes:
       - ./dareg/:/srv/dareg
     environment:
       # In production mode requests are served by Gunicorn webserver
       PRODUCTION: false
-      DJANGO_DEBUG: true
+      DJANGO_DEBUG: True
       # List of allowed hosts separated by spaces (e.g.: "localhost domain.xyz 10.0.0.1")
       # If set to "*" all hosts are allowed
       DJANGO_ALLOWED_HOSTS: "*"
+      DJANGO_ALLOWED_ORIGINS: "http://localhost:8083 http://localhost"
       DJANGO_SECRET_KEY: "qig2%p#k@kcc!u@+e&ou7@*(a$3!g&5kprv7^k#1q_i7_t5s5r"
       DB_HOST: postgres
       DB_PORT: 5432

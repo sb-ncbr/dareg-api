@@ -2,60 +2,42 @@ from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from .models import Facility, Metadata, Project, Dataset, Schema
 
-
-class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
-    """Extend the HyperlinkedModelSerializer to add IDs as well for the best of
-    both worlds.
-    """
-
-    id = serializers.ReadOnlyField()
-
-
-class MinimalHyperlinkedModelSerialized(serializers.HyperlinkedModelSerializer):
-    """Extend the HyperlinkedModelSerializer to add IDs as well for the best of
-    both worlds.
-    """
-
-    id = serializers.ReadOnlyField()
-
-
-class UserSerializer(HyperlinkedModelSerializerWithId):
+class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["url", "username", "email", "groups"]
+        fields = ["username", "email", "groups"]
 
 
-class GroupSerializer(HyperlinkedModelSerializerWithId):
+class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
-        fields = ["url", "name"]
+        fields = ["name"]
 
 
-class FacilitySerializer(HyperlinkedModelSerializerWithId):
+class FacilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Facility
         fields = "__all__"
 
 
-class MinimalSchemaSerializer(MinimalHyperlinkedModelSerialized):
+class MinimalSchemaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Schema
-        fields = ["id", "name", "url"]
+        fields = ["id", "name", "description"]
 
 
-class SchemaSerializer(HyperlinkedModelSerializerWithId):
+class SchemaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Schema
         fields = "__all__"
 
 
-class MinimalMetadataSerializer(MinimalHyperlinkedModelSerialized):
+class MinimalMetadataSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Schema
-        fields = ["id", "url"]
+        fields = ["id"]
 
 
-class MetadataResponseSerializer(HyperlinkedModelSerializerWithId):
+class MetadataResponseSerializer(serializers.ModelSerializer):
     template = SchemaSerializer(read_only=True)
 
     class Meta:
@@ -63,7 +45,7 @@ class MetadataResponseSerializer(HyperlinkedModelSerializerWithId):
         fields = "__all__"
 
 
-class MetadataSerializer(HyperlinkedModelSerializerWithId):
+class MetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = Metadata
         fields = "__all__"
@@ -75,7 +57,7 @@ class MetadataSerializer(HyperlinkedModelSerializerWithId):
         )
 
 
-class ProjectResponseSerializer(HyperlinkedModelSerializerWithId):
+class ProjectResponseSerializer(serializers.ModelSerializer):
     facility = FacilitySerializer(read_only=True)
     default_dataset_schema = MinimalSchemaSerializer(read_only=True)
     project_schema = MinimalSchemaSerializer(read_only=True)
@@ -96,7 +78,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return ProjectResponseSerializer(context=self.context).to_representation(data)
 
 
-class DatasetResponseSerializer(HyperlinkedModelSerializerWithId):
+class DatasetResponseSerializer(serializers.ModelSerializer):
     project = MinimalSchemaSerializer(read_only=True)
     dataset_schema = MinimalSchemaSerializer(read_only=True)
 
@@ -104,7 +86,7 @@ class DatasetResponseSerializer(HyperlinkedModelSerializerWithId):
         model = Dataset
         fields = "__all__"
     
-class DatasetSerializer(HyperlinkedModelSerializerWithId):
+class DatasetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Dataset
