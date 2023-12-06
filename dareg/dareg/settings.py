@@ -190,8 +190,7 @@ if DEBUG:
     hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
     INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + INTERNAL_IPS
 
-if PRODUCTION:
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Use WhiteNoise to serve static files
 STORAGES = {
@@ -231,6 +230,5 @@ if DEBUG:
         }
     )
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5000",
-]
+CORS_ALLOWED_ORIGINS = os.environ["DJANGO_ALLOWED_ORIGINS"].split()
+CSRF_TRUSTED_ORIGINS = os.environ["DJANGO_ALLOWED_ORIGINS"].split()
