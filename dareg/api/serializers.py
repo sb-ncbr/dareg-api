@@ -1,6 +1,17 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
-from .models import Facility, Project, Dataset, Schema
+from .models import Facility, Project, Dataset, Schema, BaseModel
+
+class BaseModelSerializer(serializers.Serializer):
+
+    name = serializers.CharField()
+    id = serializers.CharField()
+    
+    class Meta:
+        model = BaseModel
+        fields = ["id", "name"]
+        abstract = False 
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,22 +31,20 @@ class FacilitySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class MinimalSchemaSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Schema
-        fields = ["id", "name", "description"]
-
-
 class SchemaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Schema
         fields = "__all__"
 
+class FacilitySerializerMinimal(serializers.ModelSerializer):
+    class Meta:
+        model = Facility
+        fields = BaseModelSerializer.Meta.fields + ["abbreviation"]
 
 class ProjectResponseSerializer(serializers.ModelSerializer):
-    facility = FacilitySerializer(read_only=True)
-    default_dataset_schema = MinimalSchemaSerializer(read_only=True)
-    project_schema = MinimalSchemaSerializer(read_only=True)
+    facility = FacilitySerializerMinimal(read_only=True)
+    default_dataset_schema = BaseModelSerializer(read_only=True)
+    project_schema = BaseModelSerializer(read_only=True)
 
     class Meta:
         model = Project
@@ -53,8 +62,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class DatasetResponseSerializer(serializers.ModelSerializer):
-    project = MinimalSchemaSerializer(read_only=True)
-    dataset_schema = MinimalSchemaSerializer(read_only=True)
+    project = BaseModelSerializer(read_only=True)
+    dataset_schema = BaseModelSerializer(read_only=True)
 
     class Meta:
         model = Dataset
