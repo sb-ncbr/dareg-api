@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets, permissions
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Facility, Project, Dataset, Schema, Metadata
+from .models import Facility, Project, Dataset, Schema
 from .serializers import (
     UserSerializer,
     GroupSerializer,
@@ -10,7 +10,6 @@ from .serializers import (
     ProjectSerializer,
     DatasetSerializer,
     SchemaSerializer,
-    MetadataSerializer,
 )
 
 
@@ -70,13 +69,3 @@ class DatasetViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["project"]
-
-
-class MetadataViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows filled template to be viewed or edited.
-    """
-
-    queryset = Metadata.objects.all()
-    serializer_class = MetadataSerializer
-    permission_classes = [permissions.IsAuthenticated]

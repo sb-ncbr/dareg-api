@@ -11,7 +11,6 @@ router.register(r"facilities", views.FacilityViewSet)
 router.register(r"projects", views.ProjectViewSet)
 router.register(r"datasets", views.DatasetViewSet)
 router.register(r"schemas", views.SchemaViewSet)
-router.register(r"metadata", views.MetadataViewSet)
 
 urlpatterns = [
     path("api/v1/", include(router.urls)),
