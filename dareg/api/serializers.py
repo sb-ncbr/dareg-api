@@ -43,7 +43,7 @@ class FacilitySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class SchemaSerializer(BaseModelSerializer):
+class SchemaSerializer(BaseModelSerializer, serializers.ModelSerializer):
 
     class Meta:
         model = Schema
@@ -54,7 +54,7 @@ class FacilitySerializerMinimal(serializers.ModelSerializer):
         model = Facility
         fields = BaseModelSerializer.Meta.fields + ["abbreviation"]
 
-class ProjectResponseSerializer(BaseModelSerializer):
+class ProjectResponseSerializer(BaseModelSerializer, serializers.ModelSerializer):
     facility = FacilitySerializerMinimal(read_only=True)
     default_dataset_schema = BaseModelSerializer(read_only=True)
     project_schema = BaseModelSerializer(read_only=True)
@@ -74,7 +74,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return ProjectResponseSerializer(context=self.context).to_representation(data)
 
 
-class DatasetResponseSerializer(BaseModelSerializer):
+class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer):
     project = BaseModelSerializer(read_only=True)
     dataset_schema = BaseModelSerializer(read_only=True)
     created_by = UserSerializerMinimal(read_only=True)
