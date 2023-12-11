@@ -9,7 +9,7 @@ python3 /srv/dareg/manage.py collectstatic --noinput
 # start web server
 echo "Start web server..."
 if [ -n "$PRODUCTION" ] && [ "$PRODUCTION" == "true" ]; then
-    gunicorn --bind 0.0.0.0:8080 dareg.wsgi
+    gunicorn --bind 0.0.0.0:8080 dareg.dareg.wsgi
 else
     python3 /srv/dareg/manage.py runserver 0.0.0.0:8080
 fi
