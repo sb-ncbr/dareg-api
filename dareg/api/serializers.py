@@ -23,6 +23,8 @@ class BaseModelSerializer(serializers.Serializer):
     class Meta:
         model = BaseModel
         fields = ["id", "name"]
+        read_only_fields = ["id", "created_by", "modified_by"]
+    
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -43,11 +45,12 @@ class FacilitySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class SchemaSerializer(BaseModelSerializer, serializers.ModelSerializer):
+class SchemaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Schema
         fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
 
 class FacilitySerializerMinimal(serializers.ModelSerializer):
     class Meta:
