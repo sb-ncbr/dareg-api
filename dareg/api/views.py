@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets, permissions
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,6 +10,7 @@ from .serializers import (
     DatasetSerializer,
     SchemaSerializer,
 )
+from .permissions import NestedPerms
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -40,13 +40,13 @@ class FacilityViewSet(viewsets.ModelViewSet):
 
     queryset = Facility.objects.all()
     serializer_class = FacilitySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [NestedPerms]
 
 
 class SchemaViewSet(viewsets.ModelViewSet):
     queryset = Schema.objects.all()
     serializer_class = SchemaSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [NestedPerms]
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -56,7 +56,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [NestedPerms]
 
 
 class DatasetViewSet(viewsets.ModelViewSet):
@@ -66,6 +66,6 @@ class DatasetViewSet(viewsets.ModelViewSet):
 
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [NestedPerms]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["project"]

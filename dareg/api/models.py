@@ -2,8 +2,9 @@ import uuid
 import datetime
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.conf import settings
+from guardian.shortcuts import assign_perm
 
 ##
 # Steps to generate UML class diagram
@@ -37,6 +38,44 @@ class BaseModel(TimeStampedModel):
         default=None,
     )
 
+    def save(self, *args, **kwargs):
+        """
+        from .permissions import max_perm
+        perm_level = {
+            "owner": 3,
+            "editor": 2,
+            "viewer": 1,
+            "none": 0
+        }
+
+        perm_level[max_per,(self, self.created_by)] >= 2
+        """
+
+        super().save(*args, **kwargs)
+
+        lowercaseClassName = self.__class__.__name__.lower()
+        if lowercaseClassName in ["facility", "schema", "project", "dataset"] and \
+            not Group.objects.filter(name=f"{self.id}_owner").exists():
+
+            ownerGroup = Group.objects.create(name=f"{self.id}_owner")
+            assign_perm(lowercaseClassName+'_owner', ownerGroup, self)
+            assign_perm(lowercaseClassName+'_editor', ownerGroup, self)
+            assign_perm(lowercaseClassName+'_viewer', ownerGroup, self)
+            ownerGroup.save()
+
+            editorGroup = Group.objects.create(name=f"{self.id}_editor")
+            assign_perm(lowercaseClassName+'_editor', editorGroup, self)
+            assign_perm(lowercaseClassName+'_viewer', editorGroup, self)
+            editorGroup.save()
+
+            viewerGroup = Group.objects.create(name=f"{self.id}_viewer")
+            assign_perm(lowercaseClassName+'_viewer', viewerGroup, self)
+            viewerGroup.save()
+
+
+            self.created_by.groups.add(ownerGroup)
+        
+
     def delete(self, *args, **kwargs):
         """
         Delete object and log deletion. 
@@ -57,6 +96,11 @@ class Facility(BaseModel):
 
     class Meta:
         verbose_name_plural = "Facilities"
+        permissions = (
+            ('facility_owner', 'Facility owner'),
+            ('facility_editor', 'Facility editor'),
+            ('facility_viewer', 'Facility viewer'),
+        )
 
 
 class Schema(BaseModel):
@@ -84,6 +128,11 @@ class Project(BaseModel):
 
     class Meta:
         unique_together = ("facility", "name")
+        permissions = (
+            ('project_owner', 'Project owner'),
+            ('project_editor', 'Project editor'),
+            ('project_viewer', 'Project viewer'),
+        )
 
 
 class Tag(BaseModel):
@@ -102,6 +151,13 @@ class Dataset(BaseModel):
     schema = models.ForeignKey(Schema, models.PROTECT, null=True, blank=True)
     metadata = models.JSONField(blank=False, null=False, default=dict)
     tags = models.ManyToManyField(Tag, blank=True)
+
+    class Meta:
+        permissions = (
+            ('dataset_owner', 'Dataset owner'),
+            ('dataset_editor', 'Dataset editor'),
+            ('dataset_viewer', 'Dataset viewer'),
+        )
 
 class Language(models.Model):
     name = models.CharField("Name", max_length=200, unique=True)

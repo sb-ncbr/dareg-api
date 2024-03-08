@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from .models import Facility, Project, Dataset, Schema, BaseModel
+from .permissions import max_perm
 
 class UserSerializerMinimal(serializers.ModelSerializer):
 
@@ -25,6 +26,30 @@ class BaseModelSerializer(serializers.Serializer):
         fields = ["id", "name"]
         read_only_fields = ["id", "created_by", "modified_by"]
     
+class PermsModelSerializer(serializers.Serializer):
+
+    perms = serializers.SerializerMethodField()
+    shares = serializers.SerializerMethodField()
+
+    def get_perms(self, obj):
+        return max_perm(obj, self.context['request'])
+    
+    def get_shares(self, obj):
+
+        shares = []
+
+        for level in ["owner", "editor", "viewer"]:
+
+            group = Group.objects.get(name=f"{obj.id}_{level}")
+            
+            for x in group.user_set.all():
+                shares.append({
+                    "id": x.id,
+                    "name": '{} {}'.format(x.first_name, x.last_name),
+                    "perms": level,
+                })
+
+        return shares
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -39,10 +64,16 @@ class GroupSerializer(serializers.ModelSerializer):
         fields = ["name"]
 
 
-class FacilitySerializer(serializers.ModelSerializer):
+class FacilitySerializer(serializers.ModelSerializer, PermsModelSerializer):
     class Meta:
         model = Facility
         fields = "__all__"
+        read_only_fields = ["created_by", "modified_by"]
+    
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Facility.objects.create(**validated_data)
 
 
 class SchemaSerializer(serializers.ModelSerializer):
@@ -57,7 +88,7 @@ class FacilitySerializerMinimal(serializers.ModelSerializer):
         model = Facility
         fields = BaseModelSerializer.Meta.fields + ["abbreviation"]
 
-class ProjectResponseSerializer(BaseModelSerializer, serializers.ModelSerializer):
+class ProjectResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
     facility = FacilitySerializerMinimal(read_only=True)
     default_dataset_schema = BaseModelSerializer(read_only=True)
     project_schema = BaseModelSerializer(read_only=True)
@@ -77,7 +108,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return ProjectResponseSerializer(context=self.context).to_representation(data)
 
 
-class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer):
+class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
     project = BaseModelSerializer(read_only=True)
     dataset_schema = BaseModelSerializer(read_only=True)
     created_by = UserSerializerMinimal(read_only=True)
