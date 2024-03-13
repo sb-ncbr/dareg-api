@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
-from .models import Facility, Project, Dataset, Schema, BaseModel
+from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile
 from .permissions import max_perm
 
 class UserSerializerMinimal(serializers.ModelSerializer):
@@ -32,7 +32,7 @@ class PermsModelSerializer(serializers.Serializer):
     shares = serializers.SerializerMethodField()
 
     def get_perms(self, obj):
-        return max_perm(obj, self.context['request'])
+        return max_perm(obj, self.context['request'], text_output=True)
     
     def get_shares(self, obj):
 
@@ -40,7 +40,7 @@ class PermsModelSerializer(serializers.Serializer):
 
         for level in ["owner", "editor", "viewer"]:
 
-            group = Group.objects.get(name=f"{obj.id}_{level}")
+            group = PermsGroup.objects.get(name=f"{obj.id}_{level}")
             
             for x in group.user_set.all():
                 shares.append({
@@ -53,9 +53,42 @@ class PermsModelSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    def get_name(self, obj):
+        return '{} {}'.format(obj.first_name, obj.last_name)
+
     class Meta:
         model = User
-        fields = ["username", "email", "groups"]
+        fields = ["id", "username", "email", "groups", "first_name", "last_name", "name"]
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    any_facilities = serializers.SerializerMethodField()
+    any_projects = serializers.SerializerMethodField()
+    any_datasets = serializers.SerializerMethodField()
+
+    def get_any_facilities(self, obj):
+        for x in Facility.objects.all():
+            if max_perm(x, self.context['request']) >= 1:
+                return True
+        return False
+    
+    def get_any_projects(self, obj):
+        for x in Project.objects.all():
+            if max_perm(x, self.context['request']) >= 1:
+                return True
+        return False
+
+    def get_any_datasets(self, obj):
+        for x in Dataset.objects.all():
+            if max_perm(x, self.context['request']) >= 1:
+                return True
+        return False
+
+    class Meta:
+        model = UserProfile
+        fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects"]
 
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -83,6 +116,11 @@ class SchemaSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["id", "created_by", "modified_by"]
 
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Schema.objects.create(**validated_data)
+
 class FacilitySerializerMinimal(serializers.ModelSerializer):
     class Meta:
         model = Facility
@@ -102,10 +140,16 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
 
     def to_representation(self, data):
         """Serialize the facility as a nested object."""
         return ProjectResponseSerializer(context=self.context).to_representation(data)
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Project.objects.create(**validated_data)
 
 
 class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
@@ -123,6 +167,13 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
 
     def to_representation(self, data):
         return DatasetResponseSerializer(context=self.context).to_representation(data)
+    
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Dataset.objects.create(**validated_data)
+

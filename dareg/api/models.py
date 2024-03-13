@@ -38,6 +38,22 @@ class BaseModel(TimeStampedModel):
         default=None,
     )
 
+    """
+    def delete(self, *args, **kwargs):
+        
+        #Delete object and log deletion. 
+
+        # TODO - insert record of deletion to log
+
+        super().save(*args, **kwargs)
+    """
+
+    class Meta:
+        abstract = True
+
+
+class PermsObject(BaseModel):
+
     def save(self, *args, **kwargs):
         """
         from .permissions import max_perm
@@ -53,42 +69,48 @@ class BaseModel(TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        lowercaseClassName = self.__class__.__name__.lower()
-        if lowercaseClassName in ["facility", "schema", "project", "dataset"] and \
-            not Group.objects.filter(name=f"{self.id}_owner").exists():
+        if not PermsGroup.objects.filter(name=f"{self.id}_owner").exists():
 
-            ownerGroup = Group.objects.create(name=f"{self.id}_owner")
-            assign_perm(lowercaseClassName+'_owner', ownerGroup, self)
-            assign_perm(lowercaseClassName+'_editor', ownerGroup, self)
-            assign_perm(lowercaseClassName+'_viewer', ownerGroup, self)
+            ownerGroup = PermsGroup.objects.create(name=f"{self.id}_owner")
+            assign_perm('owner', ownerGroup, self)
+            assign_perm('editor', ownerGroup, self)
+            assign_perm('viewer', ownerGroup, self)
             ownerGroup.save()
 
-            editorGroup = Group.objects.create(name=f"{self.id}_editor")
-            assign_perm(lowercaseClassName+'_editor', editorGroup, self)
-            assign_perm(lowercaseClassName+'_viewer', editorGroup, self)
+            editorGroup = PermsGroup.objects.create(name=f"{self.id}_editor")
+            assign_perm('editor', editorGroup, self)
+            assign_perm('viewer', editorGroup, self)
             editorGroup.save()
 
-            viewerGroup = Group.objects.create(name=f"{self.id}_viewer")
-            assign_perm(lowercaseClassName+'_viewer', viewerGroup, self)
+            viewerGroup = PermsGroup.objects.create(name=f"{self.id}_viewer")
+            assign_perm('viewer', viewerGroup, self)
             viewerGroup.save()
 
-
-            self.created_by.groups.add(ownerGroup)
-        
+            #self.created_by.groups.add(ownerGroup)
+            ownerGroup.user_set.add(self.created_by)
 
     def delete(self, *args, **kwargs):
-        """
-        Delete object and log deletion. 
-        """
-        # TODO - insert record of deletion to log
-
-        super().save(*args, **kwargs)
+        for x in ["owner", "editor", "viewer"]:
+            PermsGroup.objects.get(name=f"{self.id}_{x}").delete()
+    
+        super().delete(*args, **kwargs)
 
     class Meta:
         abstract = True
 
 
-class Facility(BaseModel):
+class PermsGroup(Group):
+    
+    @property
+    def object(self):
+        return self.name.split("_")[0]
+    
+    @property
+    def level(self):
+        return self.name.split("_")[1]
+
+
+class Facility(PermsObject):
     name = models.CharField("Name", max_length=200, unique=True)
     abbreviation = models.CharField("Abbreviation", max_length=20, unique=True)
     web = models.URLField("Web", max_length=200, blank=True)
@@ -97,9 +119,9 @@ class Facility(BaseModel):
     class Meta:
         verbose_name_plural = "Facilities"
         permissions = (
-            ('facility_owner', 'Facility owner'),
-            ('facility_editor', 'Facility editor'),
-            ('facility_viewer', 'Facility viewer'),
+            ('owner', 'Owner'),
+            ('editor', 'Editor'),
+            ('viewer', 'Viewer'),
         )
 
 
@@ -114,7 +136,7 @@ class Schema(BaseModel):
         unique_together = ("name", "version")
 
 
-class Project(BaseModel):
+class Project(PermsObject):
     facility = models.ForeignKey(Facility, models.PROTECT)
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500)
@@ -129,9 +151,9 @@ class Project(BaseModel):
     class Meta:
         unique_together = ("facility", "name")
         permissions = (
-            ('project_owner', 'Project owner'),
-            ('project_editor', 'Project editor'),
-            ('project_viewer', 'Project viewer'),
+            ('owner', 'Owner'),
+            ('editor', 'Editor'),
+            ('viewer', 'Viewer'),
         )
 
 
@@ -144,7 +166,7 @@ class MetadataExtractor(BaseModel):
     name = models.CharField("Name", max_length=200, unique=True)
 
 
-class Dataset(BaseModel):
+class Dataset(PermsObject):
     project = models.ForeignKey(Project, models.PROTECT)
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500)
@@ -154,9 +176,9 @@ class Dataset(BaseModel):
 
     class Meta:
         permissions = (
-            ('dataset_owner', 'Dataset owner'),
-            ('dataset_editor', 'Dataset editor'),
-            ('dataset_viewer', 'Dataset viewer'),
+            ('owner', 'Owner'),
+            ('editor', 'Editor'),
+            ('viewer', 'Viewer'),
         )
 
 class Language(models.Model):

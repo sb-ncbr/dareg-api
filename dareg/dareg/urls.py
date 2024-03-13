@@ -7,10 +7,11 @@ from api import views
 router = routers.DefaultRouter()
 router.register(r"users", views.UserViewSet)
 router.register(r"groups", views.GroupViewSet)
-router.register(r"facilities", views.FacilityViewSet)
-router.register(r"projects", views.ProjectViewSet)
-router.register(r"datasets", views.DatasetViewSet)
+router.register(r"facilities", views.FacilityViewSet, basename='facility')
+router.register(r"projects", views.ProjectViewSet, basename='project')
+router.register(r"datasets", views.DatasetViewSet, basename='dataset')
 router.register(r"schemas", views.SchemaViewSet)
+router.register(r"profile", views.ProfileViewSet, basename='profile')
 
 urlpatterns = [
     path("api/v1/", include(router.urls)),
