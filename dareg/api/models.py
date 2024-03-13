@@ -58,12 +58,10 @@ class PermsObject(BaseModel):
     """
 
     def save(self, *args, **kwargs):
-        """
-        Creating PermsGroup for new PermsObject. 
-        """
-
+        
         super().save(*args, **kwargs)
 
+        # Creating PermsGroup for new PermsObject
         if not PermsGroup.objects.filter(name=f"{self.id}_owner").exists():
 
             content_type
@@ -111,6 +109,14 @@ class PermsGroup(Group):
         (VIEWER, "Viewer"),
     ]
     role = models.CharField(max_length=6, choices=ROLE_CHOICES)
+
+def save(self, *args, **kwargs):
+
+        super().save(*args, **kwargs)
+
+        if object = Dataset and self.role = OWNER:
+            assign_perm(Permission.objects.get(codename="view_dataset"), self, self.content_object)
+
 
 
 class Facility(PermsObject):
