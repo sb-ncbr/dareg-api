@@ -53,45 +53,30 @@ class BaseModel(TimeStampedModel):
 
 
 class PermsObject(BaseModel):
+    """
+    Objects for which permissions are managed. 
+    """
 
     def save(self, *args, **kwargs):
         """
-        from .permissions import max_perm
-        perm_level = {
-            "owner": 3,
-            "editor": 2,
-            "viewer": 1,
-            "none": 0
-        }
-
-        perm_level[max_per,(self, self.created_by)] >= 2
+        Creating PermsGroup for new PermsObject. 
         """
 
         super().save(*args, **kwargs)
 
         if not PermsGroup.objects.filter(name=f"{self.id}_owner").exists():
 
-            ownerGroup = PermsGroup.objects.create(name=f"{self.id}_owner")
-            assign_perm('owner', ownerGroup, self)
-            assign_perm('editor', ownerGroup, self)
-            assign_perm('viewer', ownerGroup, self)
-            ownerGroup.save()
+            content_type
+            ownerGroup = PermsGroup.objects.create(name=f"{self.id}_owner", content_object=self, role=PermsGroup.OWNER)
+            editorGroup = PermsGroup.objects.create(name=f"{self.id}_editor", content_object=self, role=PermsGroup.EDITOR))
+            viewerGroup = PermsGroup.objects.create(name=f"{self.id}_viewer", content_object=self, role=PermsGroup.VIEWER))
 
-            editorGroup = PermsGroup.objects.create(name=f"{self.id}_editor")
-            assign_perm('editor', editorGroup, self)
-            assign_perm('viewer', editorGroup, self)
-            editorGroup.save()
-
-            viewerGroup = PermsGroup.objects.create(name=f"{self.id}_viewer")
-            assign_perm('viewer', viewerGroup, self)
-            viewerGroup.save()
-
-            #self.created_by.groups.add(ownerGroup)
+            # add user who created the object to owners
             ownerGroup.user_set.add(self.created_by)
 
     def delete(self, *args, **kwargs):
-        for x in ["owner", "editor", "viewer"]:
-            PermsGroup.objects.get(name=f"{self.id}_{x}").delete()
+        # delete PermsGroups
+        PermsGroup.objects.filter(object_id=self.id).delete() # TODO - mozno asi nahradit CASCADE v content_object
     
         super().delete(*args, **kwargs)
 
@@ -100,14 +85,32 @@ class PermsObject(BaseModel):
 
 
 class PermsGroup(Group):
-    
-    @property
-    def object(self):
-        return self.name.split("_")[0]
-    
-    @property
-    def level(self):
-        return self.name.split("_")[1]
+    """
+    The group we use to control user permissions to PermsObjects. 
+    """
+
+    object_id = models.CharField(
+        max_length=36,
+        help_text="Object id",
+    )
+
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="Content type of the model",
+    )
+
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    OWNER = "Owner"
+    EDITOR = "Editor"
+    VIEWER = "Viewer"
+    ROLE_CHOICES = [
+        (OWNER, "Owner"),
+        (EDITOR, "Editor"),
+        (VIEWER, "Viewer"),
+    ]
+    role = models.CharField(max_length=6, choices=ROLE_CHOICES)
 
 
 class Facility(PermsObject):
