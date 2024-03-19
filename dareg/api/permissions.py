@@ -15,39 +15,6 @@ def update_perms(id, request):
             user = User.objects.get(id=x["id"])
             group.user_set.add(user)
 
-def max_perm(obj, request, current_perm="none", text_output=False):
-
-    higher_level = {
-        "dataset": Project,
-        "project": Facility,
-        "facility": None
-    }
-
-    perm_level = {
-        "owner": 3,
-        "editor": 2,
-        "viewer": 1,
-        "none": 0
-    }
-
-    for x in ["owner", "editor", "viewer"]:
-        
-        if x == current_perm:
-            break
-        
-        if request.user.has_perm(x, obj):
-            current_perm = x
-            break
-    
-    upper_obj = higher_level[obj.__class__.__name__.lower()]
-    
-    if not upper_obj:
-        return current_perm if text_output else perm_level[current_perm]
-    
-    obj = getattr(obj, upper_obj.__name__.lower())
-    
-    return max_perm(obj, request, current_perm, text_output)
-
 
 class NestedPerms(permissions.BasePermission):
 
@@ -55,20 +22,20 @@ class NestedPerms(permissions.BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
-        
+
         match request.method:
             case "GET":
-                required_perm = 1
+                required_perm = PermsGroup.VIEWER
             case "POST":
-                required_perm = 2
+                required_perm = PermsGroup.EDITOR
             case "PUT":
-                required_perm = 2
+                required_perm = PermsGroup.EDITOR
             case "PATCH":
-                required_perm = 2
+                required_perm = PermsGroup.EDITOR
             case "DELETE":
-                required_perm = 3
+                required_perm = PermsGroup.OWNER
             case "OPTIONS":
-                required_perm = 1
+                required_perm = PermsGroup.VIEWER
                 
-        return max_perm(obj, request) >= required_perm
+        return obj.perm_atleast(request, required_perm)
 

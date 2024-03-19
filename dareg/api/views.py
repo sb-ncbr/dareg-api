@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets, permissions
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Facility, Project, Dataset, Schema, UserProfile
+from .models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup
 from .serializers import (
     UserSerializer,
     GroupSerializer,
@@ -11,7 +11,7 @@ from .serializers import (
     SchemaSerializer,
     ProfileSerializer,
 )
-from .permissions import NestedPerms, max_perm, update_perms
+from .permissions import NestedPerms, update_perms
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import PermissionDenied
 
@@ -59,7 +59,7 @@ class FacilityViewSet(viewsets.ModelViewSet):
             return queryset.filter(id=self.kwargs.get('pk'))
         
         elif self.action == 'list':
-            return [obj for obj in queryset if max_perm(obj, self.request) >= 1]
+            return [obj for obj in queryset if obj.perm_atleast(self.request, PermsGroup.VIEWER)]
         
         else:
             return queryset
@@ -87,7 +87,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return queryset.filter(id=self.kwargs.get('pk'))
         
         elif self.action == 'list':
-            return [obj for obj in queryset if max_perm(obj, self.request) >= 1]
+            return [obj for obj in queryset if obj.perm_atleast(self.request, PermsGroup.VIEWER)]
         
         else:
             return queryset
@@ -95,7 +95,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         
-        if max_perm(Facility.objects.get(id=self.request.data.get('facility')), request=self.request) >= 2:
+        if Facility.objects.get(id=self.request.data.get('facility')).perm_atleast(self.request, PermsGroup.EDITOR):
             serializer.save()
         
         else:
@@ -103,7 +103,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         
     def perform_update(self, serializer):
         
-        if max_perm(Project.objects.get(id=self.kwargs.get('pk')), request=self.request) >= 3:
+        if Project.objects.get(id=self.kwargs.get('pk')).perm_atleast(self.request, PermsGroup.OWNER):
             update_perms(self.kwargs.get('pk'), self.request)
         serializer.save()
     
@@ -127,14 +127,14 @@ class DatasetViewSet(viewsets.ModelViewSet):
             return queryset.filter(id=self.kwargs.get('pk'))
         
         elif self.action == 'list':
-            return [obj for obj in queryset if max_perm(obj, self.request) >= 1]
+            return [obj for obj in queryset if obj.perm_atleast(self.request, PermsGroup.VIEWER)]
 
         else:
             return queryset
     
     def perform_create(self, serializer):
         
-        if max_perm(Project.objects.get(id=self.request.data.get('project')), request=self.request) >= 2:
+        if Project.objects.get(id=self.request.data.get('project')).perm_atleast(self.request, PermsGroup.EDITOR):
             serializer.save()
         
         else:
@@ -142,7 +142,7 @@ class DatasetViewSet(viewsets.ModelViewSet):
     
     def perform_update(self, serializer):
         
-        if max_perm(Dataset.objects.get(id=self.kwargs.get('pk')), request=self.request) >= 3:
+        if Dataset.objects.get(id=self.kwargs.get('pk')).perm_atleast(self.request, PermsGroup.OWNER):
             update_perms(self.kwargs.get('pk'), self.request)
         serializer.save()
 

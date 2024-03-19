@@ -1,7 +1,6 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile
-from .permissions import max_perm
 
 class UserSerializerMinimal(serializers.ModelSerializer):
 
@@ -32,7 +31,7 @@ class PermsModelSerializer(serializers.Serializer):
     shares = serializers.SerializerMethodField()
 
     def get_perms(self, obj):
-        return max_perm(obj, self.context['request'], text_output=True)
+        return obj.max_perm(self.context['request'])
     
     def get_shares(self, obj):
 
@@ -70,19 +69,19 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def get_any_facilities(self, obj):
         for x in Facility.objects.all():
-            if max_perm(x, self.context['request']) >= 1:
+            if x.perm_atleast(self.context['request'], PermsGroup.VIEWER):
                 return True
         return False
     
     def get_any_projects(self, obj):
         for x in Project.objects.all():
-            if max_perm(x, self.context['request']) >= 1:
+            if x.perm_atleast(self.context['request'], PermsGroup.VIEWER):
                 return True
         return False
 
     def get_any_datasets(self, obj):
         for x in Dataset.objects.all():
-            if max_perm(x, self.context['request']) >= 1:
+            if x.perm_atleast(self.context['request'], PermsGroup.VIEWER):
                 return True
         return False
 
