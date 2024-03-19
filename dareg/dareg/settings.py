@@ -226,7 +226,7 @@ if DEBUG:
             "loggers": {
                 # root logger
                 "": {
-                    "level": "DEBUG",
+                    "level": "ERROR",
                     "handlers": ["console"],
                 },
             },
