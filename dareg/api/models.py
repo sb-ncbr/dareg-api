@@ -81,13 +81,13 @@ class PermsObject(BaseModel):
             "facility": None
         }
 
-        for x in ["owner", "editor", "viewer"]:
+        for x in [["owner", "delete"], ["editor", "change"], ["viewer", "view"]]:
             
             if x == current_perm:
                 break
             
-            if request.user.groups.filter(name=f"{self.id}_{x}").exists():
-                current_perm = x
+            if request.user.has_perm(f"{x[1]}_{self.__class__.__name__.lower()}", self):
+                current_perm = x[0]
                 break
         
         upper_obj = higher_level[self.__class__.__name__.lower()]
