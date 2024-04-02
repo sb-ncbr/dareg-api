@@ -4,7 +4,6 @@ WORKDIR /srv/dareg
 
 # install python packages
 COPY ./requirements.txt .
-COPY dareg/onedata_api/libs/onedata_core dareg/onedata_api/libs/onedata_core ./libs/onedata_core/
 RUN apt update && apt install -y git
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
