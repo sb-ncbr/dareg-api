@@ -3,7 +3,7 @@ image: node:20-alpine
 stages:
   - build
   # - publish
-  # - review
+  - review
   - staging
   - production
   - cleanup
@@ -103,10 +103,10 @@ stop-review:
     - kubectl delete deployments,services,ingresses,configmaps,secrets -n ${K8S_NAMESPACE} -l deployment-id=$APP
   when: manual
   variables:
-    APP: review-$CI_COMMIT_REF_SLUG
+    APP: dev
     GIT_STRATEGY: none
   environment:
-    name: review/$CI_COMMIT_REF_SLUG
+    name: dev
     action: stop
   only:
     - branches
