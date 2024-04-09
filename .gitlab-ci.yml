@@ -46,22 +46,23 @@ build_image:
       - $CI_PROJECT_DIR/manifests/prepared/$APP_COMPONENT
     expire_in: 1 week
 
-# review:
-#   <<: *deploy
-#   stage: review
-#   variables:
-#     APP_COMPONENT: server
-#     APP: dev
-#     APP_HOST: api.$APP.${DEPLOYMENT_TLD}
-#     APP_HOST_FIX: api.$APP.${DEPLOYMENT_TLD_FIX}
-#   environment:
-#     name: dev
-#     url: https://api.dev.${DEPLOYMENT_TLD}
-#     on_stop: stop-review
-#   only:
-#     - branches
-#   except:
-#     - master
+review:
+  <<: *deploy
+  stage: review
+  variables:
+    APP_COMPONENT: server
+    APP: dev
+    APP_HOST: api.$APP.${DEPLOYMENT_TLD}
+    APP_HOST_FIX: api.$APP.${DEPLOYMENT_TLD_FIX}
+  environment:
+    name: dev
+    url: https://api.dev.${DEPLOYMENT_TLD}
+    on_stop: stop-review
+  when: manual
+  only:
+    - branches
+  except:
+    - master
 
 staging:
   <<: *deploy
