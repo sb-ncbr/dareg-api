@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "api",
+    'guardian',
 ]
 
 MIDDLEWARE = [
@@ -143,6 +144,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTHENTICATION_BACKENDS = (
     "api.backends.DAREG_OIDCAuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",
+    'guardian.backends.ObjectPermissionBackend',
 )
 
 OIDC_OP_AUTHORIZATION_ENDPOINT = os.environ["OIDC_AUTHORIZATION_ENDPOINT"]

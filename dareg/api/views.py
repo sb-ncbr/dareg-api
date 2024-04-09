@@ -1,8 +1,7 @@
-from django.shortcuts import render
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets, permissions
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Facility, Project, Dataset, Schema
+from .models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup
 from .serializers import (
     UserSerializer,
     GroupSerializer,
@@ -10,7 +9,18 @@ from .serializers import (
     ProjectSerializer,
     DatasetSerializer,
     SchemaSerializer,
+    ProfileSerializer,
 )
+from .permissions import NestedPerms, update_perms
+from guardian.shortcuts import get_objects_for_user
+from rest_framework.exceptions import PermissionDenied
+
+class ProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = ProfileSerializer
+    
+    def get_queryset(self):
+        queryset = UserProfile.objects.all()
+        return queryset.filter(user=self.request.user.id)        
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -38,15 +48,27 @@ class FacilityViewSet(viewsets.ModelViewSet):
     API endpoint that allows facilities to be viewed or edited.
     """
 
-    queryset = Facility.objects.all()
     serializer_class = FacilitySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [NestedPerms]
 
+    def get_queryset(self):
+        
+        queryset = Facility.objects.all()
+        
+        if self.action == 'retrieve':
+            return queryset.filter(id=self.kwargs.get('pk'))
+        
+        elif self.action == 'list':
+            return [obj for obj in queryset if obj.perm_atleast(self.request, PermsGroup.VIEWER)]
+        
+        else:
+            return queryset
+    
 
 class SchemaViewSet(viewsets.ModelViewSet):
     queryset = Schema.objects.all()
     serializer_class = SchemaSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = []
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -54,18 +76,73 @@ class ProjectViewSet(viewsets.ModelViewSet):
     API endpoint that allows project to be viewed or edited.
     """
 
-    queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [NestedPerms]
 
+    def get_queryset(self):
+        
+        queryset = Project.objects.all()
+        
+        if self.action == 'retrieve':
+            return queryset.filter(id=self.kwargs.get('pk'))
+        
+        elif self.action == 'list':
+            return [obj for obj in queryset if obj.perm_atleast(self.request, PermsGroup.VIEWER)]
+        
+        else:
+            return queryset
+
+    
+    def perform_create(self, serializer):
+        
+        if Facility.objects.get(id=self.request.data.get('facility')).perm_atleast(self.request, PermsGroup.EDITOR):
+            serializer.save()
+        
+        else:
+            raise PermissionDenied({"detail": "You do not have permissions to create a new project in this facility."})
+        
+    def perform_update(self, serializer):
+        
+        if Project.objects.get(id=self.kwargs.get('pk')).perm_atleast(self.request, PermsGroup.OWNER):
+            update_perms(self.kwargs.get('pk'), self.request)
+        serializer.save()
+    
 
 class DatasetViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows dataset to be viewed or edited.
     """
 
-    queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["project"]
+    permission_classes = [NestedPerms]
+
+    def get_queryset(self):
+        
+        if self.request.GET.get('project'):
+            queryset = Dataset.objects.filter(project=self.request.GET.get('project'))
+        else:
+            queryset = Dataset.objects.all()
+        
+        if self.action == 'retrieve':
+            return queryset.filter(id=self.kwargs.get('pk'))
+        
+        elif self.action == 'list':
+            return [obj for obj in queryset if obj.perm_atleast(self.request, PermsGroup.VIEWER)]
+
+        else:
+            return queryset
+    
+    def perform_create(self, serializer):
+        
+        if Project.objects.get(id=self.request.data.get('project')).perm_atleast(self.request, PermsGroup.EDITOR):
+            serializer.save()
+        
+        else:
+            raise PermissionDenied({"detail": "You do not have permissions to create a new dataset in this project."})
+    
+    def perform_update(self, serializer):
+        
+        if Dataset.objects.get(id=self.kwargs.get('pk')).perm_atleast(self.request, PermsGroup.OWNER):
+            update_perms(self.kwargs.get('pk'), self.request)
+        serializer.save()
+
