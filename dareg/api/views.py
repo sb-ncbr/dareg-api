@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User, Group
+from requests import Response
 from rest_framework import viewsets, permissions
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup
@@ -14,6 +15,7 @@ from .serializers import (
 from .permissions import NestedPerms, update_perms
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import PermissionDenied
+from onedata_api.middleware import create_new_dataset
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
@@ -21,7 +23,6 @@ class ProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = UserProfile.objects.all()
         return queryset.filter(user=self.request.user.id)        
-
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -146,3 +147,14 @@ class DatasetViewSet(viewsets.ModelViewSet):
             update_perms(self.kwargs.get('pk'), self.request)
         serializer.save()
 
+
+    def create(self, request, *args, **kwargs):
+
+        serializer = DatasetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        a = create_new_dataset(request.data.get("project"), request.data.get("name"))
+        print(a)
+        if a.file_id is None:
+            raise ValueError("Creation of dataset within data management system failed. Cannot proceed with dataset registration.")
+        request.data["onedata_file_id"] = a.file_id
+        return super().create(request, *args, **kwargs)
