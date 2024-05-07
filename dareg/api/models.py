@@ -1,3 +1,5 @@
+import hashlib
+import os
 import uuid
 import datetime
 from django.db import models
@@ -255,6 +257,22 @@ class UserProfile(TimeStampedModel):
     full_name = models.CharField("Full name", max_length=200)
     language = models.ForeignKey(Language, models.PROTECT, null=True, blank=True)
     default_data_rows = models.IntegerField(choices=TableRowsOptions.choices, default=TableRowsOptions.VALUE1)
+
+    @property
+    def app_version(self):
+        return {
+            "version": os.getenv("APP_VERSION", "0.0.0"),
+            "date": os.getenv("APP_VERSION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")),
+            "environment": os.getenv("APP_ENV", "local"),
+        }
+    
+    @property
+    def avatar(self):
+        return f"https://www.gravatar.com/avatar/{hashlib.sha256(self.user.email.lower().encode()).hexdigest()}"
+
+    @property
+    def last_login(self):
+        return self.user.last_login
 
     def __str__(self):
         return f'{self.full_name}'
