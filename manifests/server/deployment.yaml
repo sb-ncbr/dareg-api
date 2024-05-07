@@ -31,6 +31,12 @@ spec:
               value: ${CI_COMMIT_TIMESTAMP}
             - name: COMMIT_HASH
               value: ${CI_COMMIT_SHORT_SHA}
+            - name: APP_VERSION
+              value: ${APP_VERSION}
+            - name: APP_VERSION_DATE
+              value: ${CI_COMMIT_TIMESTAMP}
+            - name: APP_ENV
+              value: ${APP}
           envFrom:
             - secretRef:
                 name: ${APP}-secrets
@@ -51,57 +57,3 @@ spec:
             capabilities:
               drop:
               - ALL
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    deployment-id: ${APP}
-  name: dareg-api-svc-${APP}
-spec:
-  selector:
-    role: dareg-api-${APP}
-  type: ClusterIP
-  ports:
-  - name: api-port
-    port: 8080
-    protocol: TCP
-    targetPort: 8080
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: dareg-api-ingress-${APP}
-  labels:
-    deployment-id: ${APP}
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    kubernetes.io/ingress.class: nginx
-    kubernetes.io/tls-acme: "true"
-spec:
-  tls:
-  - hosts:
-      - ${APP_HOST}
-      - ${APP_HOST_FIX}
-    secretName: ${APP}-dareg-api-dyn-cloud-e-infra-cz
-  rules:
-  - host: ${APP_HOST}
-    http:
-      paths:
-        - pathType: ImplementationSpecific
-          path: "/"
-          backend:
-            service:
-              name: dareg-api-svc-${APP}
-              port: 
-                name: api-port
-  - host: ${APP_HOST_FIX}
-    http:
-      paths:
-        - pathType: ImplementationSpecific
-          path: "/"
-          backend:
-            service:
-              name: dareg-api-svc-${APP}
-              port: 
-                name: api-port
