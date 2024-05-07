@@ -45,6 +45,7 @@ class PermsModelSerializer(serializers.Serializer):
                         "id": x.id,
                         "name": '{} {}'.format(x.first_name, x.last_name),
                         "perms": level,
+                        "last_login": x.last_login,
                     })
             except PermsGroup.DoesNotExist:
                 print(f"Group {level} does not exist for {obj}", flush=True)

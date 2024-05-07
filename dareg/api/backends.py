@@ -1,3 +1,4 @@
+from datetime import datetime
 import re
 from urllib import response
 from django.contrib.auth.models import User
@@ -111,6 +112,7 @@ class DAREG_OIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user.first_name = claims.get("given_name", "")
         user.last_name = claims.get("family_name", "")
         user.email = claims.get("email", "")
+        user.last_login = datetime.now()
         user.save()
         try:
             user_profile = UserProfile.objects.get(user=user)
