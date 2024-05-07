@@ -103,14 +103,14 @@ stop-review:
   script:
     - echo "All cluster resources within the namespace ${K8S_NAMESPACE} with label 'deployment-id=$APP' will be removed" || true
     - kubectl delete deployments,services,ingresses,configmaps,secrets -n ${K8S_NAMESPACE} -l deployment-id=$APP
-  when: manual
   variables:
     APP: dev
     GIT_STRATEGY: none
   environment:
     name: dev
     action: stop
-  only:
-    - branches
-  except:
-    - master
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: never
