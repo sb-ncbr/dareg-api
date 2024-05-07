@@ -1,0 +1,10 @@
+.venv
+README.md
+.gitignore
+.git
+.gitlab
+docs
+manifests
+.gitlab-ci.yml
+docker-compose.yml
+Dockerfile

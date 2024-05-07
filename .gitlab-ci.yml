@@ -3,7 +3,7 @@ image: node:20-alpine
 stages:
   - build
   # - publish
-  # - review
+  - review
   - staging
   - production
   - cleanup
@@ -18,14 +18,16 @@ variables:
 
 build_image:
   stage: build
-  image: docker:latest
-  services:
-    - docker:dind
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
   before_script:
-    - docker login -u $HUB_REGISTRY_USER -p $HARBOR_PASSWORD $HARBOR_URL
+    - echo "{\"auths\":{\"${HARBOR_URL}\":{\"auth\":\"$(printf "%s:%s" "${HUB_REGISTRY_USER}" "${HARBOR_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
   script:
-    - docker build --tag $DOCKER_IMAGE_NAME:$CI_COMMIT_SHORT_SHA --tag latest --tag $CI_COMMIT_REF_NAME -f $CI_PROJECT_DIR/Dockerfile .
-    - docker push --all-tags $DOCKER_IMAGE_NAME
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${DOCKER_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}"
 
 .deploy: &deploy
   image:
@@ -46,22 +48,23 @@ build_image:
       - $CI_PROJECT_DIR/manifests/prepared/$APP_COMPONENT
     expire_in: 1 week
 
-# review:
-#   <<: *deploy
-#   stage: review
-#   variables:
-#     APP_COMPONENT: server
-#     APP: dev
-#     APP_HOST: api.$APP.${DEPLOYMENT_TLD}
-#     APP_HOST_FIX: api.$APP.${DEPLOYMENT_TLD_FIX}
-#   environment:
-#     name: dev
-#     url: https://api.dev.${DEPLOYMENT_TLD}
-#     on_stop: stop-review
-#   only:
-#     - branches
-#   except:
-#     - master
+review:
+  <<: *deploy
+  stage: review
+  variables:
+    APP_COMPONENT: server
+    APP: dev
+    APP_HOST: api.devel.${DEPLOYMENT_TLD}
+    APP_HOST_FIX: api.devel.${DEPLOYMENT_TLD_FIX}
+  environment:
+    name: dev
+    url: https://api.devel.${DEPLOYMENT_TLD}
+    on_stop: stop-review
+  when: manual
+  only:
+    - branches
+  except:
+    - master
 
 staging:
   <<: *deploy
@@ -102,10 +105,10 @@ stop-review:
     - kubectl delete deployments,services,ingresses,configmaps,secrets -n ${K8S_NAMESPACE} -l deployment-id=$APP
   when: manual
   variables:
-    APP: review-$CI_COMMIT_REF_SLUG
+    APP: dev
     GIT_STRATEGY: none
   environment:
-    name: review/$CI_COMMIT_REF_SLUG
+    name: dev
     action: stop
   only:
     - branches

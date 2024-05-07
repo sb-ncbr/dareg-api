@@ -170,10 +170,14 @@ class Facility(PermsObject):
     abbreviation = models.CharField("Abbreviation", max_length=20, unique=True)
     web = models.URLField("Web", max_length=200, blank=True)
     email = models.EmailField("Email", max_length=200, blank=True)
+    onedata_token = models.CharField("Onedata Secret token", max_length=512, blank=True)
+    onedata_provider_url = models.URLField("Onedata provider URL", max_length=200, blank=True)
 
     class Meta:
         verbose_name_plural = "Facilities"
 
+    def __str__(self):
+                return f'{self.name}'
 
 class Schema(BaseModel):
     version = models.PositiveIntegerField("Version", default=1)
@@ -184,6 +188,9 @@ class Schema(BaseModel):
 
     class Meta:
         unique_together = ("name", "version")
+
+    def __str__(self):
+            return f'{self.name}:{self.version}'
 
 
 class Project(PermsObject):
@@ -197,9 +204,13 @@ class Project(PermsObject):
         blank=True,
         related_name="default_dataset_schema",
     )
+    onedata_space_id = models.CharField("Onedata space ID", max_length=200, blank=True)
 
     class Meta:
         unique_together = ("facility", "name")
+
+    def __str__(self):
+        return f'{self.name} @ {self.facility.name}'
 
 
 class Tag(BaseModel):
@@ -218,7 +229,10 @@ class Dataset(PermsObject):
     schema = models.ForeignKey(Schema, models.PROTECT, null=True, blank=True)
     metadata = models.JSONField(blank=False, null=False, default=dict)
     tags = models.ManyToManyField(Tag, blank=True)
+    onedata_file_id = models.CharField("Onedata File ID", max_length=512, blank=True)
 
+    def __str__(self):
+        return f'{self.name}'
 
 class Language(models.Model):
     name = models.CharField("Name", max_length=200, unique=True)
@@ -241,3 +255,6 @@ class UserProfile(TimeStampedModel):
     full_name = models.CharField("Full name", max_length=200)
     language = models.ForeignKey(Language, models.PROTECT, null=True, blank=True)
     default_data_rows = models.IntegerField(choices=TableRowsOptions.choices, default=TableRowsOptions.VALUE1)
+
+    def __str__(self):
+        return f'{self.full_name}'

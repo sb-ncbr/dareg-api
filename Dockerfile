@@ -4,9 +4,14 @@ WORKDIR /srv/dareg
 
 # install python packages
 COPY ./requirements.txt .
+RUN apt update && apt install -y git
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt \
+    && pip install "oneprovider-client @ git+https://github.com/CERIT-SC/onedata-libs#subdirectory=oneprovider_client" \
+    && pip install "onezone-client @ git+https://github.com/CERIT-SC/onedata-libs#subdirectory=onezone_client" \
+    && pip install "onepanel-client @ git+https://github.com/CERIT-SC/onedata-libs#subdirectory=onepanel_client" \
+    && pip install "onedata_wrapper @ git+https://github.com/CERIT-SC/onedata_core.git@devel"
 
 ## Runtime image
 FROM python:3.11-slim AS base

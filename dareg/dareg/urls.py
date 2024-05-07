@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from rest_framework import routers
 from api import views
+from onedata_api.urls import urlpatterns as onedata_router
 
 router = routers.DefaultRouter()
 router.register(r"users", views.UserViewSet)
@@ -15,6 +16,7 @@ router.register(r"profile", views.ProfileViewSet, basename='profile')
 
 urlpatterns = [
     path("api/v1/", include(router.urls)),
+    path("onedata-api/v1/", include(onedata_router)),
     path("", RedirectView.as_view(url="api/v1", permanent=True)),
     path("admin/", admin.site.urls),
     path("api/auth/", include("rest_framework.urls", namespace="rest_framework")),
