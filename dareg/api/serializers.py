@@ -34,19 +34,21 @@ class PermsModelSerializer(serializers.Serializer):
         return obj.max_perm(self.context['request'])
     
     def get_shares(self, obj):
-
         shares = []
 
         for level in ["owner", "editor", "viewer"]:
 
-            group = PermsGroup.objects.get(name=f"{obj.id}_{level}")
-            
-            for x in group.user_set.all():
-                shares.append({
-                    "id": x.id,
-                    "name": '{} {}'.format(x.first_name, x.last_name),
-                    "perms": level,
-                })
+            try:
+                group = PermsGroup.objects.get(name=f"{obj.id}_{level}")
+                for x in group.user_set.all():
+                    shares.append({
+                        "id": x.id,
+                        "name": '{} {}'.format(x.first_name, x.last_name),
+                        "perms": level,
+                        "last_login": x.last_login,
+                    })
+            except PermsGroup.DoesNotExist:
+                print(f"Group {level} does not exist for {obj}", flush=True)
 
         return shares
 
@@ -87,7 +89,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects"]
+        fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects", "app_version", "avatar", "last_login"]
 
 
 class GroupSerializer(serializers.ModelSerializer):

@@ -54,6 +54,7 @@ review:
   variables:
     APP_COMPONENT: server
     APP: dev
+    APP_VERSION: $CI_COMMIT_SHORT_SHA
     APP_HOST: api.devel.${DEPLOYMENT_TLD}
     APP_HOST_FIX: api.devel.${DEPLOYMENT_TLD_FIX}
   environment:
@@ -72,6 +73,7 @@ staging:
   variables:
     APP_COMPONENT: server
     APP: staging
+    APP_VERSION: $CI_COMMIT_SHORT_SHA
     APP_HOST: api.stage.${DEPLOYMENT_TLD}
     APP_HOST_FIX: api.stage.${DEPLOYMENT_TLD_FIX}
   environment:
@@ -86,6 +88,7 @@ production:
   variables:
     APP_COMPONENT: server
     APP: production
+    APP_VERSION: $CI_COMMIT_TAG
     APP_HOST: "api.${DEPLOYMENT_TLD}"
     APP_HOST_FIX: api.${DEPLOYMENT_TLD_FIX}
   when: manual
@@ -103,14 +106,14 @@ stop-review:
   script:
     - echo "All cluster resources within the namespace ${K8S_NAMESPACE} with label 'deployment-id=$APP' will be removed" || true
     - kubectl delete deployments,services,ingresses,configmaps,secrets -n ${K8S_NAMESPACE} -l deployment-id=$APP
-  when: manual
   variables:
     APP: dev
     GIT_STRATEGY: none
   environment:
     name: dev
     action: stop
-  only:
-    - branches
-  except:
-    - master
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: never
