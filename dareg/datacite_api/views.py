@@ -83,3 +83,19 @@ class DoiViewSet(APIView):
 
         else:
             return HttpResponse('', status=401, content_type='text/html')
+        
+    def delete(self, request):
+
+        current_dataset = get_object_or_404(Dataset, pk=request.data.get('dataset_id'))
+
+        if current_dataset.perm_atleast(request, PermsGroup.EDITOR):
+
+            response = requests.delete(f"{DATACITE_API_URL}/{current_dataset.doi}/", headers=headers, auth=auth)
+
+            return JsonResponse({
+                "success": response.status_code == 200,
+                "dataset_id": current_dataset.id,
+            })
+
+        else:
+            return HttpResponse('', status=401, content_type='text/html')
