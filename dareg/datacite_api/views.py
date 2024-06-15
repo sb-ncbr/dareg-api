@@ -41,7 +41,7 @@ class DoiViewSet(APIView):
                 })
         
         else:
-            return HttpResponse('', status=401, content_type='text/html')
+            return HttpResponse('', status=403, content_type='text/html')
         
 
     def post(self, request):
@@ -64,7 +64,7 @@ class DoiViewSet(APIView):
             })
         
         else:
-            return HttpResponse('', status=401, content_type='text/html')
+            return HttpResponse('', status=403, content_type='text/html')
     
     def put(self, request):
 
@@ -82,7 +82,7 @@ class DoiViewSet(APIView):
             })
 
         else:
-            return HttpResponse('', status=401, content_type='text/html')
+            return HttpResponse('', status=403, content_type='text/html')
         
     def delete(self, request):
 
@@ -98,4 +98,4 @@ class DoiViewSet(APIView):
             })
 
         else:
-            return HttpResponse('', status=401, content_type='text/html')
+            return HttpResponse('', status=403, content_type='text/html')
