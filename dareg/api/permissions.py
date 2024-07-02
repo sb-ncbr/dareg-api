@@ -39,3 +39,11 @@ class NestedPerms(permissions.BasePermission):
                 
         return obj.perm_atleast(request, required_perm)
 
+class SameUser(permissions.BasePermission):
+
+    def has_permission(self, request, view):
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        return obj.user == request.user
+    

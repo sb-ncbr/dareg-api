@@ -12,17 +12,24 @@ from .serializers import (
     SchemaSerializer,
     ProfileSerializer,
 )
-from .permissions import NestedPerms, update_perms
+from .permissions import NestedPerms, update_perms, SameUser
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 from onedata_api.middleware import create_new_dataset
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
-    
+    permission_classes = [IsAuthenticated, SameUser]
+
     def get_queryset(self):
         queryset = UserProfile.objects.all()
-        return queryset.filter(user=self.request.user.id)        
+        return queryset.filter(user=self.request.user.id)
+
+    def get_object(self):
+        queryset = self.get_queryset()
+        return queryset.get(user=self.request.user.id)
+     
 
 class UserViewSet(viewsets.ModelViewSet):
     """

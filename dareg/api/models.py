@@ -254,10 +254,17 @@ class UserProfile(TimeStampedModel):
         VALUE3 = 100
         VALUE4 = 250
 
+    THEME_CHOICES = [
+        ('dark', 'Dark'),
+        ('light', 'Light'),
+        ('system', 'System'),
+    ]
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, models.PROTECT)
     full_name = models.CharField("Full name", max_length=200)
     language = models.ForeignKey(Language, models.PROTECT, null=True, blank=True)
     default_data_rows = models.IntegerField(choices=TableRowsOptions.choices, default=TableRowsOptions.VALUE1)
+    default_theme = models.CharField(max_length=6, choices=THEME_CHOICES, default='system')
 
     @property
     def app_version(self):
