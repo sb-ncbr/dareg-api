@@ -1,16 +1,15 @@
-import requests
+import requests, os
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from api.models import Dataset, PermsGroup
 from rest_framework.views import APIView
 from rest_framework import permissions
 from api.permissions import NestedPerms
-from decouple import config
 from datacite_api.backends import build_datacite_request
 
-DATACITE_API_URL = config('DATACITE_API_URL')
-DATACITE_API_USERNAME = config('DATACITE_API_USERNAME')
-DATACITE_API_PASSWORD = config('DATACITE_API_PASSWORD')
+DATACITE_API_URL = os.getenv("DATACITE_API_URL", "https://api.test.datacite.org")
+DATACITE_API_USERNAME = os.getenv("DATACITE_API_USERNAME", "")
+DATACITE_API_PASSWORD = os.getenv("DATACITE_API_PASSWORD", "")
 
 headers = {
     'Content-Type': 'application/vnd.api+json',

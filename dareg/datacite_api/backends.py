@@ -1,8 +1,8 @@
 from api.models import Dataset
-import datetime
-from decouple import config
+import datetime, os
+# from decouple import config
 
-FRONTEND_URL = config('FRONTEND_URL')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 def build_datacite_request(dataset: Dataset):
     return {
