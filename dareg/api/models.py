@@ -232,6 +232,7 @@ class Dataset(PermsObject):
     metadata = models.JSONField(blank=False, null=False, default=dict)
     tags = models.ManyToManyField(Tag, blank=True)
     onedata_file_id = models.CharField("Onedata File ID", max_length=512, blank=True)
+    doi = models.CharField("DOI", max_length=50, null=True, blank=True)
 
     def __str__(self):
         return f'{self.name}'
