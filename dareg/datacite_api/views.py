@@ -7,7 +7,7 @@ from rest_framework import permissions
 from api.permissions import NestedPerms
 from datacite_api.backends import build_datacite_request
 
-DATACITE_API_URL = os.getenv("DATACITE_API_URL", "https://api.test.datacite.org")
+DATACITE_API_URL = os.getenv("DATACITE_API_URL", "https://api.test.datacite.org/dois")
 DATACITE_API_USERNAME = os.getenv("DATACITE_API_USERNAME", "")
 DATACITE_API_PASSWORD = os.getenv("DATACITE_API_PASSWORD", "")
 
