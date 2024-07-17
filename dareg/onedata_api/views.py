@@ -50,9 +50,9 @@ class FilesViewSet(APIView):
     def post(self, request):
         # return Response(request.data)
         if request.data.get('collection_id') is None:
-            return Response({"error": "collection_id is a required parameter"})
+            return Response({"error": "collection_id is a required parameter"}, status=400)
         if request.data.get('dataset_name') is None:
-            return Response({"error": "dataset_name is a required parameter"})
+            return Response({"error": "dataset_name is a required parameter"}, status=400)
 
         response = create_new_dataset(request.data.get('collection_id'), request.data.get('dataset_name'))
 
@@ -61,7 +61,7 @@ class FilesViewSet(APIView):
     def get(self, request):
 
         if request.GET.get('dataset_id') is None:
-            return Response({"error": "dataset_id is a required parameter"})
+            return Response({"error": "dataset_id is a required parameter"}, status=400)
 
         dataset = Dataset.objects.get(id=request.GET.get('dataset_id'))
         space_id = ""
@@ -71,9 +71,12 @@ class FilesViewSet(APIView):
         else:
             file_id = dataset.onedata_file_id
 
+        if file_id is None or file_id == "":
+            return Response({"error": "Dataset is not supported by any Onedata space. Please contact the administrator of DAREG."}, status=404)
+
         facility_token = dataset.project.facility.onedata_token
         if facility_token is None or facility_token == "":
-            return Response({"error": "Dataset doesn't have any supported space. Please contact the administrator of DAREG."})
+            return Response({"error": "Facility is not supported by any Onedata space. Please contact the administrator of DAREG."}, status=404)
 
         self.oneprovider_configuration.host = dataset.project.facility.onedata_provider_url
         self.oneprovider_configuration.api_key['X-Auth-Token'] = facility_token
