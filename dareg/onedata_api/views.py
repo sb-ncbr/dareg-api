@@ -54,9 +54,9 @@ class FilesViewSet(APIView):
         if request.data.get('dataset_name') is None:
             return Response({"error": "dataset_name is a required parameter"}, status=400)
 
-        response = create_new_dataset(request.data.get('collection_id'), request.data.get('dataset_name'))
+        response, share = create_new_dataset(request.data.get('collection_id'), request.data.get('dataset_name'))
 
-        return Response({"files": dict(response)})
+        return Response({"files": dict(response), "share": share})
 
     def get(self, request):
 

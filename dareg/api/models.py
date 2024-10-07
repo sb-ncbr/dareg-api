@@ -232,6 +232,7 @@ class Dataset(PermsObject):
     metadata = models.JSONField(blank=False, null=False, default=dict)
     tags = models.ManyToManyField(Tag, blank=True)
     onedata_file_id = models.CharField("Onedata File ID", max_length=512, blank=True)
+    onedata_share_id = models.CharField("Onedata Default Share ID", max_length=512, blank=True)
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
 
     def __str__(self):
@@ -269,7 +270,7 @@ class UserProfile(TimeStampedModel):
     full_name = models.CharField("Full name", max_length=200)
     language = models.ForeignKey(Language, models.PROTECT, null=True, blank=True)
     default_data_rows = models.IntegerField(choices=TableRowsOptions.choices, default=TableRowsOptions.VALUE1)
-    default_theme = models.CharField(max_length=6, choices=THEME_CHOICES, default='system')
+    default_theme = models.CharField(max_length=6, choices=THEME_CHOICES, default='light')
     default_lang = models.CharField(max_length=5, choices=LANG_CHOICES, default='en-US')
 
     @property

@@ -1,5 +1,3 @@
-version: "3.8"
-
 volumes:
   dareg-postgres15:
 
@@ -23,8 +21,8 @@ services:
       args:
         COMMIT_DATE: "2020-01-01"
         COMMIT_HASH: "not_set"
-    depends_on:
-      - postgres
+    # depends_on:
+    #   - postgres
     ports:
       - 8083:8080
     volumes:
@@ -37,20 +35,26 @@ services:
       # If set to "*" all hosts are allowed
       DJANGO_ALLOWED_HOSTS: "*"
       DJANGO_ALLOWED_ORIGINS: "http://localhost:8083 http://localhost http://localhost:5000"
+      DATACITE_API_USERNAME: "UPWJ.GSFWIC"
+      DATACITE_API_PASSWORD: "855tqsh2kT8Dra6qgdb329r7"
+      DATACITE_API_URL: "https://api.test.datacite.org"
       DJANGO_SECRET_KEY: "qig2%p#k@kcc!u@+e&ou7@*(a$3!g&5kprv7^k#1q_i7_t5s5r"
+      # DB_HOST: 147.251.253.204
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: pass123worD
       DB_NAME: dareg
-      OIDC_AUTHORIZATION_ENDPOINT: https://oidc.muni.cz/oidc/auth/authorize
-      OIDC_TOKEN_ENDPOINT: https://oidc.muni.cz/oidc/token
-      OIDC_USER_ENDPOINT: https://oidc.muni.cz/oidc/userinfo
-      OIDC_JWKS_ENDPOINT: https://oidc.muni.cz/oidc/jwk
+      # DB_PASSWORD: EXANPa7#25xVGBbtNyRb3GX5XxFSU9suenJfk3fAKbp54uMe*jpR@jwuP
+      # DB_NAME: dareg-database-prod
+      OIDC_AUTHORIZATION_ENDPOINT: https://id.muni.cz/oidc/auth/authorize
+      OIDC_TOKEN_ENDPOINT: https://id.muni.cz/oidc/token
+      OIDC_USER_ENDPOINT: https://id.muni.cz/oidc/userinfo
+      OIDC_JWKS_ENDPOINT: https://id.muni.cz/oidc/jwk
       OIDC_CLIENT_ID: 9016cb62-acb6-4b73-b7af-93b773c6fc22
       OIDC_CLIENT_SECRET: 7e3e258c-e97d-45d7-b3f3-4f97fbb4e34dabf25ab8-a4af-485f-a903-1eb7c16a987f
       OIDC_ALLOWED_EDUPERSON_ENTITLEMENT: None
-      OIDC_LOGOUT_REDIRECT_URL: https://oidc.muni.cz/oidc/endsession
+      OIDC_LOGOUT_REDIRECT_URL: https://id.muni.cz/oidc/endsession
   adminer:
     image: adminer
     restart: unless-stopped

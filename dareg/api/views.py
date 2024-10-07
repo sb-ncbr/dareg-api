@@ -159,9 +159,9 @@ class DatasetViewSet(viewsets.ModelViewSet):
 
         serializer = DatasetSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        a = create_new_dataset(request.data.get("project"), request.data.get("name"))
-        print(a)
-        if a.file_id is None:
+        files, share = create_new_dataset(request.data.get("project"), request.data.get("name"))
+        if files.file_id is None:
             raise ValueError("Creation of dataset within data management system failed. Cannot proceed with dataset registration.")
-        request.data["onedata_file_id"] = a.file_id
+        request.data["onedata_file_id"] = files.file_id
+        request.data["onedata_share_id"] = share.share_id
         return super().create(request, *args, **kwargs)
