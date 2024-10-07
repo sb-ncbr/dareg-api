@@ -159,6 +159,11 @@ class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer
     created_by = UserSerializerMinimal(read_only=True)
     modified_by = UserSerializerMinimal(read_only=True)
 
+    onedata_visit_id = serializers.SerializerMethodField(source='onedata_visit_id')
+
+    def get_onedata_visit_id(self, obj):
+        return obj.onedata_visit_id
+    
     class Meta:
         model = Dataset
         fields = "__all__"
@@ -168,7 +173,6 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = "__all__"
-        read_only_fields = ["id", "created_by", "modified_by", "doi"]
 
     def to_representation(self, data):
         return DatasetResponseSerializer(context=self.context).to_representation(data)

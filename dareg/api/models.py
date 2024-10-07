@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import os
 import uuid
@@ -233,10 +234,16 @@ class Dataset(PermsObject):
     tags = models.ManyToManyField(Tag, blank=True)
     onedata_file_id = models.CharField("Onedata File ID", max_length=512, blank=True)
     onedata_share_id = models.CharField("Onedata Default Share ID", max_length=512, blank=True)
+    onedata_dataset_id = models.CharField("Onedata Dataset ID", max_length=512, blank=True)
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
 
     def __str__(self):
         return f'{self.name}'
+  
+    @property
+    def onedata_visit_id(self):
+        to_base64 = f"guid#{self.onedata_dataset_id}#{self.project.onedata_space_id}"
+        return base64.b64encode(to_base64.encode())
 
 class Language(models.Model):
     name = models.CharField("Name", max_length=200, unique=True)

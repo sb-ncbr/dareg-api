@@ -154,14 +154,17 @@ class DatasetViewSet(viewsets.ModelViewSet):
             update_perms(self.kwargs.get('pk'), self.request)
         serializer.save()
 
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
 
         serializer = DatasetSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        files, share = create_new_dataset(request.data.get("project"), request.data.get("name"))
+        files, share, datasetId = create_new_dataset(request.data.get("project"), request.data.get("name"))
         if files.file_id is None:
             raise ValueError("Creation of dataset within data management system failed. Cannot proceed with dataset registration.")
         request.data["onedata_file_id"] = files.file_id
         request.data["onedata_share_id"] = share.share_id
+        request.data["onedata_dataset_id"] = datasetId
         return super().create(request, *args, **kwargs)

@@ -63,8 +63,27 @@ def create_new_dataset(collection_id, dataset_name):
 
     if new_share.share_id is None:
         return {"error": "Failed to create the share for the dataset. Please contact the administrator of DAREG."}
+    
+    dataset_id = None
+    try:
+        print(f"Establishing dataset on top of directory {new_file.file_id}", flush=True)
+        url = f"{oneprovider_configuration.host}/datasets"
+        headers = {
+            "X-Auth-Token": facility_token,
+            "Content-Type": "application/json"
+        }
+        data = {
+            "rootFileId": new_file.file_id
+        }
+        response = requests.post(url, headers=headers, json=data)
+        print(response.status_code, flush=True)
 
-    return new_file, new_share
+        if response.status_code == 201:
+            dataset_id = response.json().get("datasetId")
+    except Exception as e:
+        return {"error": f"Failed to establish dataset on top of directory {new_file.file_id}. {e}"}
+
+    return new_file, new_share, dataset_id
 
 def download_file(file_id):
     pass
