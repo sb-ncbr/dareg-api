@@ -173,6 +173,7 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
 
     def to_representation(self, data):
         return DatasetResponseSerializer(context=self.context).to_representation(data)
