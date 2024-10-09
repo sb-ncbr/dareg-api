@@ -16,7 +16,8 @@ from .permissions import NestedPerms, update_perms, SameUser
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
-from onedata_api.middleware import create_new_dataset
+from rest_framework.decorators import action
+from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_folder
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
@@ -155,16 +156,71 @@ class DatasetViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def update(self, request, *args, **kwargs):
+        serializer = DatasetSerializer(data=request.data)
+
+        old_dataset = Dataset.objects.get(id=self.kwargs.get('pk'))
+
+        if not serializer.is_valid(raise_exception=True):
+            return Response(serializer.errors, status=400)
+
+        if old_dataset.name != request.data.get('name'):
+            rename_folder(old_dataset.project, old_dataset.onedata_file_id, request.data.get('name'))
+
         return super().update(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
-
         serializer = DatasetSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        files, share, datasetId = create_new_dataset(request.data.get("project"), request.data.get("name"))
-        if files.file_id is None:
-            raise ValueError("Creation of dataset within data management system failed. Cannot proceed with dataset registration.")
-        request.data["onedata_file_id"] = files.file_id
+        if not serializer.is_valid(raise_exception=True):
+            return Response(serializer.errors, status=400)
+        
+        project = Project.objects.get(id=request.data.get('project'))
+        folder, err_folder = create_new_dataset(project, request.data.get('name'))
+        if err_folder:
+            raise ValueError(err_folder)
+        
+        request.data["onedata_file_id"] = folder.file_id
+
+        share, err_share = create_public_share(project, request.data.get('name'), request.data.get('description'), folder)
         request.data["onedata_share_id"] = share.share_id
+
+        # Returns dataset id
+        datasetId, err_dataset = establish_dataset(project, folder)
         request.data["onedata_dataset_id"] = datasetId
+        
         return super().create(request, *args, **kwargs)
+    
+    @action(detail=False, methods=['post'])
+    def create_public_share(self, request, *args, **kwargs):
+        if self.kwargs.get('pk') is None:
+            raise ValueError("Dataset ID is required to create a public share.")
+        dataset = Dataset.objects.get(id=self.kwargs.get('pk'))
+        if not dataset.perms_atleast(request, PermsGroup.EDITOR):
+            raise PermissionDenied({"detail": "You do not have permissions to create a public share for this dataset."})
+        share = create_public_share(dataset)
+        dataset.onedata_share_id = share.share_id
+        dataset.save()
+        return Response({"onedata_share_id": share.share_id})
+    
+    @action(detail=False, methods=['post'])
+    def create_dataset(self, request, *args, **kwargs):
+        if self.kwargs.get('pk') is None:
+            raise ValueError("Dataset ID is required to create a visit folder.")
+        dataset = Dataset.objects.get(id=self.kwargs.get('pk'))
+        if not dataset.perms_atleast(request, PermsGroup.EDITOR):
+            raise PermissionDenied({"detail": "You do not have permissions to create a visit folder for this dataset."})
+        folder = establish_dataset(dataset.project, dataset.onedata_file_id)
+        dataset.onedata_visit_id = folder
+        dataset.save()
+        return Response({"onedata_dataset_id": folder})
+
+    @action(detail=False, methods=['post'])
+    def create_onedata_folder(self, request, *args, **kwargs):
+        if self.kwargs.get('pk') is None:
+            raise ValueError("Dataset ID is required to create a Onedata folder.")
+        dataset = Dataset.objects.get(id=self.kwargs.get('pk'))
+        if not dataset.perms_atleast(request, PermsGroup.EDITOR):
+            raise PermissionDenied({"detail": "You do not have permissions to create a visit folder for this dataset."})
+        folder, err_folder = create_new_dataset(dataset.project, request.data.get('name'))
+        dataset.onedata_file_id = folder
+        dataset.save()
+        return Response({"onedata_file_id": folder.file_id})

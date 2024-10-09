@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+import string
 import uuid
 import datetime
 from django.db import models
@@ -75,7 +76,7 @@ class PermsObject(BaseModel):
 
             # add user who created the object to owners
             ownerGroup.user_set.add(self.created_by)
-
+        
     def max_perm(self, request, current_perm="none"):
 
         higher_level = {
@@ -157,7 +158,7 @@ class PermsGroup(Group):
         super().save(*args, **kwargs)
 
         # assign permissions
-        class_name = self.content_object.__class__.__name__.lower()
+        class_name = self.content_object._meta.verbose_name.lower()
 
         if self.role == self.OWNER:
             assign_perm(f"delete_{class_name}", self, self.content_object)
@@ -167,6 +168,8 @@ class PermsGroup(Group):
         
         assign_perm(f"view_{class_name}", self, self.content_object)
 
+    def __str__(self):
+        return f'{self.content_type.model_class()._meta.verbose_name.capitalize()} - {self.content_object} - {self.role}'
 
 class Facility(PermsObject):
     name = models.CharField("Name", max_length=200, unique=True)
@@ -193,7 +196,7 @@ class Schema(BaseModel):
         unique_together = ("name", "version")
 
     def __str__(self):
-            return f'{self.name}:{self.version}'
+            return f'{self.name} (v.{self.version})'
 
 
 class Project(PermsObject):
@@ -213,7 +216,7 @@ class Project(PermsObject):
         unique_together = ("facility", "name")
 
     def __str__(self):
-        return f'{self.name} @ {self.facility.name}'
+        return f'{self.name}'
 
 
 class Tag(BaseModel):
@@ -232,9 +235,9 @@ class Dataset(PermsObject):
     schema = models.ForeignKey(Schema, models.PROTECT, null=True, blank=True)
     metadata = models.JSONField(blank=False, null=False, default=dict)
     tags = models.ManyToManyField(Tag, blank=True)
-    onedata_file_id = models.CharField("Onedata File ID", max_length=512, blank=True)
-    onedata_share_id = models.CharField("Onedata Default Share ID", max_length=512, blank=True)
-    onedata_dataset_id = models.CharField("Onedata Dataset ID", max_length=512, blank=True)
+    onedata_file_id = models.CharField("Onedata File ID", max_length=512, null=True, blank=True)
+    onedata_share_id = models.CharField("Onedata Default Share ID", max_length=512, null=True, blank=True)
+    onedata_dataset_id = models.CharField("Onedata Dataset ID", max_length=512, null=True, blank=True)
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
 
     def __str__(self):
@@ -244,6 +247,9 @@ class Dataset(PermsObject):
     def onedata_visit_id(self):
         to_base64 = f"guid#{self.onedata_dataset_id}#{self.project.onedata_space_id}"
         return base64.b64encode(to_base64.encode())
+    
+    class Meta:
+        unique_together = ("project", "name")
 
 class Language(models.Model):
     name = models.CharField("Name", max_length=200, unique=True)
@@ -255,7 +261,7 @@ class Language(models.Model):
     )
 
 
-class UserProfile(TimeStampedModel):
+class UserProfile(BaseModel):
     class TableRowsOptions(models.IntegerChoices):
         VALUE1 = 25
         VALUE2 = 50
