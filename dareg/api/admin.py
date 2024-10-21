@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from datetime import date, timedelta
 from typing import Any
 from django.contrib import admin
 
@@ -22,6 +23,33 @@ from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
+
+class TimeStampFilter(admin.SimpleListFilter):
+        title = 'Date and time'
+        parameter_name = 'timestamp'
+
+        def lookups(self, request, model_admin):
+            return (
+                ('today', 'Today'),
+                ('yesterday', 'Yesterday'),
+                ('this_week', 'This week'),
+                ('this_month', 'This month'),
+                ('this_year', 'This year')
+            )
+
+        def queryset(self, request, queryset):
+            if self.value() == 'today':
+                time = date.today()
+                return queryset.filter(created__date=time)
+            if self.value() == 'yesterday':
+                return queryset.filter(created__date=date.today() - timedelta(days=1))
+            if self.value() == 'this_week':
+                return queryset.filter(created__week=date.today().isocalendar()[1])
+            if self.value() == 'this_month':
+                return queryset.filter(created__month=date.today().month)
+            if self.value() == 'this_year':
+                return queryset.filter(created__year=date.today().year)
+            return queryset
 
 class BaseModelAdmin(GuardedModelAdmin, admin.ModelAdmin):
 
@@ -69,11 +97,20 @@ class BaseModelAdmin(GuardedModelAdmin, admin.ModelAdmin):
 class ProjectAdminInline(admin.TabularInline):
     model = Project
     extra = 0
+    readonly_fields = ('name', 'description')
 
 class DatasetAdminInline(admin.TabularInline):
     model = Dataset
     extra = 0
-    fields = ('name', 'description')
+    fields = ('name', 'description', 'schema', )
+    readonly_fields = ('name', 'description', 'schema', )
+
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class ProjectAdmin(BaseModelAdmin):
@@ -91,7 +128,7 @@ class ProjectAdmin(BaseModelAdmin):
 class DatasetAdmin(BaseModelAdmin):
     list_display = ('name', 'project', 'onedata_share_link', 'onedata_link') + BaseModelAdmin.list_display
     search_fields = ('name', 'description')
-    list_filter = ('project','project__facility', 'schema')
+    list_filter = ('project','project__facility', 'schema', TimeStampFilter)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
