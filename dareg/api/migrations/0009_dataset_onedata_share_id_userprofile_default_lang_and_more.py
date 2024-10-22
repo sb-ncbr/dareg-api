@@ -24,17 +24,4 @@ class Migration(migrations.Migration):
             name='default_theme',
             field=models.CharField(choices=[('dark', 'Dark'), ('light', 'Light'), ('system', 'System')], default='light', max_length=6),
         ),
-        migrations.CreateModel(
-            name='PermsGroup',
-            fields=[
-                ('group_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='auth.group')),
-                ('object_id', models.UUIDField(editable=False, help_text='Object id', null=True)),
-                ('role', models.CharField(choices=[('Owner', 'Owner'), ('Editor', 'Editor'), ('Viewer', 'Viewer')], max_length=6, null=True)),
-                ('content_type', models.ForeignKey(help_text='Content type of the model', null=True, on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
-            ],
-            bases=('auth.group',),
-            managers=[
-                ('objects', django.contrib.auth.models.GroupManager()),
-            ],
-        ),
     ]
