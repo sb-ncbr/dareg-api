@@ -5,6 +5,11 @@ from django.db import migrations, models
 import django.db.models.deletion
 import uuid
 
+def populate_uuid_ids(apps, schema_editor):
+    UserProfile = apps.get_model('api', 'UserProfile')
+    for profile in UserProfile.objects.all():
+        profile.uuid_id = uuid.uuid4()
+        profile.save()
 
 class Migration(migrations.Migration):
 
@@ -28,9 +33,24 @@ class Migration(migrations.Migration):
             name='modified_by',
             field=models.ForeignKey(blank=True, default=None, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='%(class)s_modified_by', to=settings.AUTH_USER_MODEL),
         ),
-        migrations.AlterField(
+        migrations.AddField(
+            model_name='userprofile',
+            name='uuid_id',
+            field=models.UUIDField(default=uuid.uuid4, editable=False, primary_key=False, serialize=False),
+        ),
+        migrations.RunPython(populate_uuid_ids),
+        migrations.RemoveField(
             model_name='userprofile',
             name='id',
-            field=models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False),
+        ),
+        migrations.AlterField(
+            model_name='userprofile',
+            name='uuid_id',
+            field=models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False, serialize=False),
+        ),
+        migrations.RenameField(
+            model_name='userprofile',
+            old_name='uuid_id',
+            new_name='id',
         ),
     ]
