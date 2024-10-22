@@ -4,7 +4,9 @@ WORKDIR /srv/dareg
 
 # install python packages
 COPY ./requirements.txt .
-RUN apt update && apt install -y git
+RUN apt update && apt install -y git vim \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install -r requirements.txt \
