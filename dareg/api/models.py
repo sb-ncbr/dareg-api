@@ -1,9 +1,10 @@
 import base64
 import hashlib
 import os
-import string
 import uuid
 import datetime
+from enum import StrEnum
+
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from django.contrib.auth.models import User, Group, Permission
@@ -80,6 +81,7 @@ class PermsObject(BaseModel):
     def max_perm(self, request, current_perm="none"):
 
         higher_level = {
+            "experiment": Dataset,
             "dataset": Project,
             "project": Facility,
             "facility": None
@@ -176,6 +178,7 @@ class Facility(PermsObject):
     abbreviation = models.CharField("Abbreviation", max_length=20, unique=True)
     web = models.URLField("Web", max_length=200, blank=True)
     email = models.EmailField("Email", max_length=200, blank=True)
+    logo = models.URLField("Logo", blank=True, max_length=200)
     onedata_token = models.CharField("Onedata Secret token", max_length=512, blank=True)
     onedata_provider_url = models.URLField("Onedata provider URL", max_length=200, blank=True)
 
@@ -184,6 +187,21 @@ class Facility(PermsObject):
 
     def __str__(self):
                 return f'{self.name}'
+
+class Instrument(PermsObject):
+    facility = models.ForeignKey(Facility, models.PROTECT)
+    name = models.CharField("Name", max_length=200)
+    method = models.CharField("Method", max_length=500)
+    support = models.CharField("Support", max_length=500)
+    contact = models.CharField("Contact", max_length=500)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, models.PROTECT)
+    default_data_dir = models.CharField("Default data directory", max_length=1024, default="/data")
+
+    class Meta:
+        unique_together = ("facility", "name")
+
+    def __str__(self):
+        return f'{self.name}'
 
 class Schema(BaseModel):
     version = models.PositiveIntegerField("Version", default=1)
@@ -239,6 +257,7 @@ class Dataset(PermsObject):
     onedata_share_id = models.CharField("Onedata Default Share ID", max_length=512, null=True, blank=True)
     onedata_dataset_id = models.CharField("Onedata Dataset ID", max_length=512, null=True, blank=True)
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
+    reservationId = models.CharField("Reservation ID", max_length=50, null=True, blank=True)
 
     def __str__(self):
         return f'{self.name}'
@@ -250,6 +269,28 @@ class Dataset(PermsObject):
     
     class Meta:
         unique_together = ("project", "name")
+
+
+class ExperimentStatus(StrEnum):
+    NEW = "new"
+    PREPARED = "prepared"
+    RUNNING = "running"
+    SYNCHRONIZING = "synchronizing"
+    SUCCESS = "success"
+    FAILURE = "failure"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
+class Experiment(PermsObject):
+    dataset = models.ForeignKey(Dataset, models.PROTECT)
+    name = models.CharField("Name", max_length=200, blank=True)
+    start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True)
+    end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True)
+    note = models.CharField("Note", max_length=500, blank=True)
+    status = models.CharField(choices=ExperimentStatus.choices(), default=ExperimentStatus.NEW, max_length=20)
+    onedata_file_id = models.CharField("Onedata File ID", max_length=512, null=True, blank=True)
 
 class Language(models.Model):
     name = models.CharField("Name", max_length=200, unique=True)

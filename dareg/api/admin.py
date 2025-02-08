@@ -13,7 +13,7 @@ from .models import (
     Dataset,
     Schema,
     Language,
-    UserProfile
+    UserProfile, Instrument, Experiment
 )
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset
 from django.contrib.auth.models import User, Group
@@ -21,6 +21,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.http import HttpRequest
 from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
+from rest_framework.authtoken.models import Token
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
 
@@ -98,6 +99,12 @@ class ProjectAdminInline(admin.TabularInline):
     model = Project
     extra = 0
     readonly_fields = ('name', 'description')
+
+class InstrumentAdminInline(admin.TabularInline):
+    model = Instrument
+    extra = 0
+    fields = ('name', 'method')
+    readonly_fields = ('name', 'method')
 
 class DatasetAdminInline(admin.TabularInline):
     model = Dataset
@@ -211,10 +218,16 @@ class DatasetAdmin(BaseModelAdmin):
     create_onedata_folder.short_description = 'Create OneData Folder'
     actions = ['create_onedata_share', 'create_dataset', 'create_onedata_folder']
 
+
+class ExperimentAdmin(BaseModelAdmin):
+    list_display = ('name', 'start_time', 'end_time', 'note', 'status') + BaseModelAdmin.list_display
+    search_fields = ('name', 'status', 'note')
+
+
 class FacilityAdmin(BaseModelAdmin):
     list_display = ('name', 'abbreviation', 'has_onedata_token', 'has_onedata_provider') + BaseModelAdmin.list_display
     search_fields = ('name', 'abbreviation')
-    inlines = [ProjectAdminInline]
+    inlines = [ProjectAdminInline, InstrumentAdminInline]
 
     def has_onedata_token(self, obj):
         return obj.onedata_token is not None
@@ -227,6 +240,34 @@ class FacilityAdmin(BaseModelAdmin):
     
     has_onedata_provider.boolean = True
     has_onedata_provider.short_description = 'OneData Provider'
+
+class InstrumentAdmin(BaseModelAdmin):
+    list_display = ('name', 'method', 'support', 'contact', 'token') + BaseModelAdmin.list_display
+    search_fields = ('name', 'method', 'support', 'contact')
+    exclude = ('user',)
+
+    def token(self, obj):
+        token = obj.user.auth_token.key
+        return token
+
+    token.short_description = 'Device Token'
+
+    def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
+        if not change:
+            user = User.objects.create_user(
+                username=f"{obj.facility.id}.{obj.id}",
+                password='password',
+                first_name=obj.name,
+                last_name=obj.facility.name
+            )
+            Token.objects.create(user=user)
+            obj.user = user
+
+            # add user to facility editor to allow create datasets
+            facility_perm_group = PermsGroup.objects.get(name=f"{obj.facility.id}_editor")
+            facility_perm_group.user_set.add(user.id)
+
+        super().save_model(request, obj, form, change)
 
 class SchemaAdmin(BaseModelAdmin):
     list_display = ('name', 'description', 'version') + BaseModelAdmin.list_display
@@ -264,7 +305,9 @@ Group.__str__ = _change_group_display_name
     
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(Dataset, DatasetAdmin)
+admin.site.register(Experiment, ExperimentAdmin)
 admin.site.register(Facility, FacilityAdmin)
+admin.site.register(Instrument, InstrumentAdmin)
 admin.site.register(Schema, SchemaAdmin)
 
 admin.site.register(UserProfile, UserProfileAdmin)

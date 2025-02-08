@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     "api",
     "datacite_api",
     'guardian',
+    'drf_spectacular',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -179,6 +181,7 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_PAGINATION_CLASS": "api.backends.CustomPagination",
     "PAGE_SIZE": 100,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # Django Debug Toolbar

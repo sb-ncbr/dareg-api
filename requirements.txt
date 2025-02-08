@@ -16,3 +16,4 @@ django-cors-headers~=4.3
 django-filter~=23.3
 python-decouple~=3.8
 docutils
+drf-spectacular

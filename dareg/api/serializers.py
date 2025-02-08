@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
-from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile
+from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment
+
 
 class UserSerializerMinimal(serializers.ModelSerializer):
 
@@ -125,7 +126,7 @@ class SchemaSerializer(serializers.ModelSerializer):
 class FacilitySerializerMinimal(serializers.ModelSerializer):
     class Meta:
         model = Facility
-        fields = BaseModelSerializer.Meta.fields + ["abbreviation"]
+        fields = BaseModelSerializer.Meta.fields + ["abbreviation", "email", "web", "logo"]
 
 class ProjectResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
     facility = FacilitySerializerMinimal(read_only=True)
@@ -153,8 +154,21 @@ class ProjectSerializer(serializers.ModelSerializer):
         return Project.objects.create(**validated_data)
 
 
+class ExperimentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Experiment
+        fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Experiment.objects.create(**validated_data)
+
+
 class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
     project = BaseModelSerializer(read_only=True)
+    experiments = ExperimentSerializer(many=True, required=True, source='experiment_set')
     dataset_schema = BaseModelSerializer(read_only=True)
     created_by = UserSerializerMinimal(read_only=True)
     modified_by = UserSerializerMinimal(read_only=True)
@@ -183,3 +197,23 @@ class DatasetSerializer(serializers.ModelSerializer):
 
         return Dataset.objects.create(**validated_data)
 
+
+class ReservationSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    name = serializers.CharField()
+    from_date = serializers.DateTimeField()
+    to_date = serializers.DateTimeField()
+    user = serializers.CharField()
+    description = serializers.CharField()
+
+class InstrumentSerializer(serializers.ModelSerializer):
+    facility = FacilitySerializerMinimal(read_only=True)
+    class Meta:
+        model = Instrument
+        fields = ["id", "name", "support", "contact", "method", "facility", "default_data_dir"]
+
+
+class TempTokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    provider_url = serializers.CharField()
+    one_data_directory_id = serializers.CharField()

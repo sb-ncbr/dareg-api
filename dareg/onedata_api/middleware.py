@@ -1,3 +1,5 @@
+from datetime import datetime, timezone, timedelta
+
 import requests
 import oneprovider_client
 from onedata_wrapper.api.file_operations_api import FileOperationsApi
@@ -10,7 +12,10 @@ from onedata_wrapper.models.filesystem.entry_request import EntryRequest
 from onedata_wrapper.models.filesystem.new_directory_request import NewDirectoryRequest
 from onedata_wrapper.models.share.new_share_request import NewShareRequest
 from onedata_wrapper.selectors.file_attribute import ALL as FA_ALL
-from api.models import Project, Dataset
+from api.models import Project, Dataset, Facility
+import base64
+
+
 
 def create_public_share(project: Project, dataset_name: str, dataset_description: str, file_entry: FileEntry):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
@@ -104,6 +109,7 @@ def create_new_dataset(project: Project, dataset_name: str):
         
     return new_file, error
 
+# TODO: Not supported by API, migrade to cdmi
 def rename_folder(project: Project, file_entry: str, new_name: str):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = project.facility.onedata_provider_url
@@ -128,3 +134,64 @@ def rename_folder(project: Project, file_entry: str, new_name: str):
         print(f"Failed to set permissions for the dataset. {e} {response.text}", flush=True)
 
     return error
+
+
+def create_new_experiment(dataset: Dataset, experiment_id: str):
+    oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    oneprovider_configuration.host = dataset.project.facility.onedata_provider_url
+    oneprovider_configuration.api_key['X-Auth-Token'] = dataset.project.facility.onedata_token
+    error = None
+
+    file_op_api = FileOperationsApi(oneprovider_configuration)
+
+    parent_er = EntryRequest(file_id=dataset.onedata_file_id)
+    new_file = None
+    try:
+        dir_request = NewDirectoryRequest(parent=parent_er, name=experiment_id)
+        newfile_entry_request = file_op_api.new_entry(dir_request)
+        new_file = file_op_api.get_file(newfile_entry_request, FA_ALL)
+    except Exception as e:
+        error = {"error": f"Failed to create the dataset. {e}"}
+
+    return new_file, error
+
+
+def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset):
+    oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    oneprovider_configuration.host = facility.onedata_provider_url
+    oneprovider_configuration.api_key['X-Auth-Token'] = facility.onedata_token
+    error = None
+    token = None
+    try:
+        print(f"Create temp token", flush=True)
+        url = f"https://onezone.devel.onedata.e-infra.cz/api/v3/onezone/user/tokens/temporary"
+        headers = {
+            "X-Auth-Token": facility.onedata_token,
+            "Content-Type": "application/json"
+        }
+        data = {
+            "accessToken": {},
+            "caveats": [
+                {
+                    "type": "time",
+                    "validUntil": int((datetime.now(timezone.utc) + timedelta(hours=5)).timestamp())
+                },
+                {
+                    "type": "data.path",
+                    "whitelist": [
+                        base64.b64encode(f"/{project.onedata_space_id}/{dataset.name}".encode("ascii")).decode("ascii")
+                    ]
+                }
+            ]
+        }
+        print(f"POST {url} {headers} {data}", flush=True)
+        response = requests.post(url, headers=headers, json=data)
+        print(response.status_code, response.text, flush=True)
+        if response.status_code == 201:
+            token = response.json().get("token")
+    except Exception as e:
+        error = {"error": f"Failed to set permissions for the dataset. {e} {response.text}"}
+        print(f"Failed to set permissions for the dataset. {e} {response.text}", flush=True)
+
+    return token, error
+
