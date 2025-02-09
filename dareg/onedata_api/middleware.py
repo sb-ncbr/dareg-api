@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from http.client import responses
 
 import requests
 import oneprovider_client
@@ -109,31 +110,50 @@ def create_new_dataset(project: Project, dataset_name: str):
         
     return new_file, error
 
-# TODO: Not supported by API, migrade to cdmi
-def rename_folder(project: Project, file_entry: str, new_name: str):
+
+def rename_entry(project: Project, file_entry_id: str, new_name: str):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = project.facility.onedata_provider_url
     oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
-    error = None
 
+    path = None
     try:
-        print(f"Rename directory", flush=True)
-        url = f"{oneprovider_configuration.host}/data/{file_entry}"
+        url = f"{oneprovider_configuration.host}/data/{file_entry_id}"
         headers = {
             "X-Auth-Token": oneprovider_configuration.api_key['X-Auth-Token'],
             "Content-Type": "application/json"
         }
         data = {
-            "name": new_name
+            "attributes": ["path"]
+        }
+        response = requests.get(url, headers=headers, json=data)
+        if response.status_code == 200:
+            path = response.json().get("path")
+    except Exception as e:
+        return {"error": f"Failed to get path for the directory {file_entry_id}. {e}"}
+
+    try:
+        print(f"Rename directory", flush=True)
+
+        from_path = path
+        to_path = path.replace(path.split("/")[-1], new_name) # TODO: May replace more than one occurence
+
+        cdmi_url = project.facility.onedata_provider_url.replace("/api/v3/oneprovider", "/cdmi") # TODO: not sure if this is ideal
+        url = f"{cdmi_url}{to_path}"
+        headers = {
+            "X-Auth-Token": oneprovider_configuration.api_key['X-Auth-Token'],
+            "Content-Type": "application/cdmi-object",
+            "X-CDMI-Specification-Version": "1.1.1"
+        }
+        data = {
+            "move": from_path
         }
         print(f"PUT {url} {headers} {data}", flush=True)
         response = requests.put(url, headers=headers, json=data) 
         print(response.status_code, response.text, flush=True)  
     except Exception as e:
-        error = {"error": f"Failed to set permissions for the dataset. {e} {response.text}"}
-        print(f"Failed to set permissions for the dataset. {e} {response.text}", flush=True)
-
-    return error
+        print(f"Failed to rename directory. {e} {response.text}", flush=True)
+        return {"error": f"Failed to rename directory. {e} {response.text}"}
 
 
 def create_new_experiment(dataset: Dataset, experiment_id: str):
@@ -164,6 +184,7 @@ def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset
     token = None
     try:
         print(f"Create temp token", flush=True)
+        #TODO: configurable url
         url = f"https://onezone.devel.onedata.e-infra.cz/api/v3/onezone/user/tokens/temporary"
         headers = {
             "X-Auth-Token": facility.onedata_token,

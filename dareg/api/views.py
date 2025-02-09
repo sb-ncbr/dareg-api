@@ -31,7 +31,7 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_folder, \
+from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
     create_new_experiment, create_new_temp_token
 
 
@@ -183,7 +183,7 @@ class DatasetViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=400)
 
         if old_dataset.name != request.data.get('name'):
-            rename_folder(old_dataset.project, old_dataset.onedata_file_id, request.data.get('name'))
+            rename_entry(old_dataset.project, old_dataset.onedata_file_id, request.data.get('name'))
 
         return super().update(request, *args, **kwargs)
 
@@ -287,7 +287,7 @@ class ExperimentViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=400)
 
         if old_experiment.name != request.data.get('name'):
-            rename_folder(old_experiment.dataset.project, old_experiment.onedata_file_id, request.data.get('name'))
+            rename_entry(old_experiment.dataset.project, old_experiment.onedata_file_id, request.data.get('name'))
 
         return super().update(request, *args, **kwargs)
 
