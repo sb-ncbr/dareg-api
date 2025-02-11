@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
+from rest_framework.fields import SerializerMethodField
+
 from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment
 
 
@@ -168,10 +170,13 @@ class ExperimentSerializer(serializers.ModelSerializer):
 
 class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
     project = BaseModelSerializer(read_only=True)
-    experiments = ExperimentSerializer(many=True, required=True, source='experiment_set')
+    experiments = SerializerMethodField()
     dataset_schema = BaseModelSerializer(read_only=True)
     created_by = UserSerializerMinimal(read_only=True)
     modified_by = UserSerializerMinimal(read_only=True)
+
+    def get_experiments(self, obj):
+        return ExperimentSerializer(obj.experiment_set.order_by('created'), many=True, required=True).data
 
     onedata_visit_id = serializers.SerializerMethodField(source='onedata_visit_id')
 
