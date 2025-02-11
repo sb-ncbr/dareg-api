@@ -141,8 +141,7 @@ class DatasetViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = DatasetSerializer
-    permission_classes = [NestedPerms, IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    permission_classes = [NestedPerms]
 
     def get_queryset(self):
         

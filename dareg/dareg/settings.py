@@ -170,6 +170,7 @@ LOGOUT_REDIRECT_URL = os.environ["OIDC_LOGOUT_REDIRECT_URL"]
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "mozilla_django_oidc.contrib.drf.OIDCAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     # Use Django's standard `django.contrib.auth` permissions,
