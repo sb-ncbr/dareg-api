@@ -59,6 +59,11 @@ class BaseModel(TimeStampedModel):
         abstract = True
 
 
+def is_stronger_perm(perm1, perm2):
+    permission_hierarchy = {"none": 0, "viewer": 1, "editor": 2, "owner": 3}
+    return permission_hierarchy[perm1] > permission_hierarchy[perm2]
+
+
 class PermsObject(BaseModel):
     """
     Objects for which permissions are managed. 
@@ -92,7 +97,7 @@ class PermsObject(BaseModel):
             if x == current_perm:
                 break
             
-            if request.user.has_perm(f"{x[1]}_{self.__class__.__name__.lower()}", self):
+            if self.is_permission_stronger(current_perm, request, x):
                 current_perm = x[0]
                 break
         
@@ -104,7 +109,11 @@ class PermsObject(BaseModel):
         obj = getattr(self, upper_obj.__name__.lower())
         
         return obj.max_perm(request, current_perm)
-    
+
+    def is_permission_stronger(self, current_perm, request, x):
+        return request.user.has_perm(f"{x[1]}_{self.__class__.__name__.lower()}", self) and is_stronger_perm(x[0],
+                                                                                                             current_perm)
+
     def perm_atleast(self, request, role):
         perm = self.max_perm(request)
         match role:
