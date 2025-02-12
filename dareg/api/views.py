@@ -1,9 +1,14 @@
 import uuid
 from datetime import datetime, timedelta, timezone
+from importlib.metadata import metadata
 
+import oneprovider_client
 import requests
 from django.contrib.auth.models import User, Group
 from django.http import HttpResponse
+from onedata_wrapper.api.file_operations_api import FileOperationsApi
+from onedata_wrapper.models.filesystem.entry_request import EntryRequest
+from onedata_wrapper.selectors.file_attribute import ALL as FA_ALL
 from rest_framework import permissions, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import get_object_or_404
@@ -32,7 +37,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
-    create_new_experiment, create_new_temp_token
+    create_new_experiment, create_new_temp_token, get_file_metadata
 
 
 class ProfileViewSet(viewsets.ModelViewSet):
@@ -252,6 +257,18 @@ class DatasetViewSet(viewsets.ModelViewSet):
         dataset = get_object_or_404(Dataset, reservationId=self.kwargs.get('pk'))
         serializer = self.get_serializer(dataset, many=False)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def shadow(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid(raise_exception=True):
+            return Response(serializer.errors, status=400)
+
+        project = Project.objects.get(id=request.data.get('project'))
+
+        metadata, error = get_file_metadata(project, request.data.get("onedata_file_id"))
+
+        return super().create(request, *args, **kwargs)
 
 
 class ExperimentViewSet(viewsets.ModelViewSet):

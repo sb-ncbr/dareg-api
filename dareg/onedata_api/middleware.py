@@ -176,6 +176,7 @@ def create_new_experiment(dataset: Dataset, experiment_id: str):
     return new_file, error
 
 
+# TODO: replace with https://github.com/CERIT-SC/onedata-libs/blob/main/onezone_client/docs/TokenApi.md#create_temporary_token_for_current_user
 def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = facility.onedata_provider_url
@@ -216,3 +217,18 @@ def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset
 
     return token, error
 
+
+def get_file_metadata(project: Project, file_id: str):
+    oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    oneprovider_configuration.host = project.facility.onedata_provider_url
+    oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
+    error = None
+    metadata = None
+
+    try:
+        file_op_api = FileOperationsApi(oneprovider_configuration)
+        metadata = file_op_api.get_file(EntryRequest(file_id), FA_ALL)
+    except Exception as e:
+        error = {"error": f"Failed to create the dataset. {e}"}
+
+    return metadata, error
