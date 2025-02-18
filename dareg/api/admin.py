@@ -21,7 +21,12 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.http import HttpRequest
 from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
-from rest_framework.authtoken.models import Token
+
+from knox import crypto 
+from knox.settings import CONSTANTS, knox_settings
+from knox.models import AuthToken
+from knox.models import AuthTokenManager
+from django.utils import timezone
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
 
@@ -242,25 +247,18 @@ class FacilityAdmin(BaseModelAdmin):
     has_onedata_provider.short_description = 'OneData Provider'
 
 class InstrumentAdmin(BaseModelAdmin):
-    list_display = ('name', 'method', 'support', 'contact', 'token') + BaseModelAdmin.list_display
+    list_display = ('name', 'method', 'support', 'contact') + BaseModelAdmin.list_display
     search_fields = ('name', 'method', 'support', 'contact')
     exclude = ('user',)
-
-    def token(self, obj):
-        token = obj.user.auth_token.key
-        return token
-
-    token.short_description = 'Device Token'
 
     def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
         if not change:
             user = User.objects.create_user(
-                username=f"{obj.facility.id}.{obj.id}",
-                password='password',
-                first_name=obj.name,
-                last_name=obj.facility.name
+                username=f"instrument-{obj.name}",
+                password=crypto.create_token_string(),
+                first_name="Instrument",
+                last_name=obj.name
             )
-            Token.objects.create(user=user)
             obj.user = user
 
             # add user to facility editor to allow create datasets
@@ -268,7 +266,7 @@ class InstrumentAdmin(BaseModelAdmin):
             facility_perm_group.user_set.add(user.id)
 
         super().save_model(request, obj, form, change)
-
+        
 class SchemaAdmin(BaseModelAdmin):
     list_display = ('name', 'description', 'version') + BaseModelAdmin.list_display
     search_fields = ('name', 'description')
@@ -300,9 +298,58 @@ def _change_group_display_name(group: Group) -> str:
         return g.__str__()
     except PermsGroup.DoesNotExist:
         return group.__str__()
+        
+class AuthTokenAdmin(admin.ModelAdmin):
+    list_display = ('user', 'created', 'expiry', 'is_expired', 'digest')
+    list_filter = ('created', 'expiry')
+    search_fields = ('user__username', 'digest')
+    actions = ['revoke_selected_tokens', 'create_new_token']
+
+    def is_expired(self, obj):
+        if obj.expiry:
+            return obj.expiry < timezone.now()
+        return False
+    is_expired.boolean = True
+    is_expired.short_description = 'Expired?'
+
+    def revoke_selected_tokens(self, request, queryset):
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f'Successfully revoked {count} tokens.')
+    revoke_selected_tokens.short_description = 'Revoke selected tokens'
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name in ['token_key', 'digest']:
+            formfield.required = False
+        return formfield
+
+    def add_view(self, request, form_url='', extra_context=None):
+        if request.method == 'POST':
+            post_data = request.POST.copy()
+            token = request.POST.get('token', knox_settings.TOKEN_PREFIX + crypto.create_token_string())
+            digest = crypto.hash_token(token)
+            post_data['digest'] = digest
+            post_data['token_key'] = token[:CONSTANTS.TOKEN_KEY_LENGTH]
+
+            request.POST = post_data
+            request._extra_context = {'token': token, 'digest': digest}
+
+        return super().add_view(request, form_url, extra_context)
+
+    def create_token(self, user_id, token_ttl):
+        user = self.model._meta.get_field('user').remote_field.model.objects.get(id=user_id)
+        instance, token = AuthTokenManager().create(user)
+        return instance, token
+
+    def response_add(self, request, obj, post_url_continue=None):
+        extra_context = getattr(request, '_extra_context', {})
+        token = extra_context.get('token')
+        self.message_user(request, format_html(f'API Token: <pre>{token}</pre> Save the token as it will not be shown again.'), level='warning')
+        return super().response_add(request, obj, post_url_continue)
 
 Group.__str__ = _change_group_display_name
-    
+
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(Dataset, DatasetAdmin)
 admin.site.register(Experiment, ExperimentAdmin)
@@ -315,3 +362,6 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 admin.site.register(Language)
+
+admin.site.unregister(AuthToken)
+admin.site.register(AuthToken, AuthTokenAdmin)

@@ -278,7 +278,6 @@ class ExperimentViewSet(viewsets.ModelViewSet):
     queryset = Experiment.objects.all()
     serializer_class = ExperimentSerializer
     permission_classes = [NestedPerms, IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
 
     def create(self, request, *args, **kwargs):
         serializer = ExperimentSerializer(data=request.data)
@@ -315,7 +314,6 @@ class ExperimentViewSet(viewsets.ModelViewSet):
 class InstrumentViewSet(viewsets.ModelViewSet):
     queryset = Instrument.objects.all()
     serializer_class = InstrumentSerializer
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'])
@@ -330,7 +328,6 @@ class InstrumentViewSet(viewsets.ModelViewSet):
 
 
 class ReservationListView(APIView):
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -370,8 +367,8 @@ class ReservationListView(APIView):
             }
         ]
 
-        date_from = request.query_params.get("date_from")
-        date_to = request.query_params.get("date_to")
+        date_from = request.query_params.get("date_from") or datetime.now(timezone.utc).isoformat()
+        date_to = request.query_params.get("date_to") or (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
 
         try:
             date_from_parsed = datetime.fromisoformat(date_from)
@@ -394,7 +391,6 @@ class ReservationListView(APIView):
 
 
 class TempTokenAPIView(APIView):
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id: str, *args, **kwargs):

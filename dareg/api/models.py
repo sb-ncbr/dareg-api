@@ -8,6 +8,8 @@ from enum import StrEnum
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from django.contrib.auth.models import User, Group, Permission
+from django.dispatch import receiver
+from django.db.models.signals import post_save, post_delete
 from django.conf import settings
 from guardian.shortcuts import assign_perm
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -351,6 +353,28 @@ class UserProfile(BaseModel):
     @property
     def last_login(self):
         return self.user.last_login
+
+    def __str__(self):
+        return f'{self.full_name}'
+    
+    @receiver(post_save, sender=User)
+    def create_profile(sender, instance, created, **kwargs):
+        try:
+            if created:
+                UserProfile.objects.create(user=instance, full_name=f'{instance.first_name} {instance.last_name}').save()
+            else:
+                if instance.userprofile.full_name == "":
+                    instance.userprofile.full_name = f'{instance.first_name} {instance.last_name}'
+                    instance.userprofile.save()
+        except Exception as err:
+            print(f'Error creating user profile!\n{err}')
+
+    @receiver(post_delete, sender=User)
+    def save_profile(sender, instance, **kwargs):
+        try:
+            instance.userprofile.delete()
+        except Exception as err:
+            print(f'Error saving user profile!\n{err}')
 
     def __str__(self):
         return f'{self.full_name}'

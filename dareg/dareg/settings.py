@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "mozilla_django_oidc",
+    'knox',
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
@@ -49,7 +50,6 @@ INSTALLED_APPS = [
     "datacite_api",
     'guardian',
     'drf_spectacular',
-    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -170,7 +170,7 @@ LOGOUT_REDIRECT_URL = os.environ["OIDC_LOGOUT_REDIRECT_URL"]
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "mozilla_django_oidc.contrib.drf.OIDCAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
+        "knox.auth.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     # Use Django's standard `django.contrib.auth` permissions,
@@ -205,6 +205,13 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
+}
+
+REST_KNOX = {
+    "TOKEN_TTL": None,
+    "AUTO_REFRESH": True,
+    "TOKEN_LIMIT_PER_USER": 10,
+    "TOKEN_CHARACTER_LENGTH": 64,
 }
 
 # Logging
