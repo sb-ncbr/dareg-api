@@ -77,13 +77,18 @@ class PermsObject(BaseModel):
 
         # Creating PermsGroup for new PermsObject
         if not PermsGroup.objects.filter(name=f"{self.id}_owner").exists():
-
             ownerGroup = PermsGroup.objects.create(name=f"{self.id}_owner", content_object=self, role=PermsGroup.OWNER)
-            PermsGroup.objects.create(name=f"{self.id}_editor", content_object=self, role=PermsGroup.EDITOR)
-            PermsGroup.objects.create(name=f"{self.id}_viewer", content_object=self, role=PermsGroup.VIEWER)
-
             # add user who created the object to owners
+            ownerGroup.save()
+
             ownerGroup.user_set.add(self.created_by)
+
+        
+        if not PermsGroup.objects.filter(name=f"{self.id}_editor").exists():
+            PermsGroup.objects.create(name=f"{self.id}_editor", content_object=self, role=PermsGroup.EDITOR)
+
+        if not PermsGroup.objects.filter(name=f"{self.id}_viewer").exists():
+            PermsGroup.objects.create(name=f"{self.id}_viewer", content_object=self, role=PermsGroup.VIEWER)
         
     def max_perm(self, request, current_perm="none"):
 
@@ -197,7 +202,7 @@ class Facility(PermsObject):
         verbose_name_plural = "Facilities"
 
     def __str__(self):
-                return f'{self.name}'
+        return f'{self.name}'
 
 class Instrument(PermsObject):
     facility = models.ForeignKey(Facility, models.PROTECT)

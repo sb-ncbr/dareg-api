@@ -25,7 +25,7 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
-if os.environ["DJANGO_DEBUG"].title() == "True":
+if os.environ["DJANGO_DEBUG"].lower() == "true":
     DEBUG = True
 
 ALLOWED_HOSTS = os.environ["DJANGO_ALLOWED_HOSTS"].split()
@@ -238,7 +238,7 @@ if DEBUG:
             "loggers": {
                 # root logger
                 "": {
-                    "level": "ERROR",
+                    "level": "INFO",
                     "handlers": ["console"],
                 },
             },
