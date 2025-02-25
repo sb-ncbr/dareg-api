@@ -1,9 +1,11 @@
 from django.contrib.auth.models import User, Group
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
 
-from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment
+from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
+    ExperimentStatus
 
 
 class UserSerializerMinimal(serializers.ModelSerializer):
@@ -178,7 +180,7 @@ class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer
 
     @extend_schema_field(ExperimentSerializer(many=True))
     def get_experiments(self, obj):
-        return ExperimentSerializer(obj.experiment_set.order_by('created'), many=True, required=True).data
+        return ExperimentSerializer(obj.experiment_set.exclude(status=ExperimentStatus.DISCARDED).order_by('created'), many=True, required=True).data
 
     onedata_visit_id = serializers.SerializerMethodField(source='onedata_visit_id')
 
@@ -212,6 +214,7 @@ class ReservationSerializer(serializers.Serializer):
     to_date = serializers.DateTimeField()
     user = serializers.CharField()
     description = serializers.CharField()
+    project_id = serializers.CharField()
 
 class InstrumentSerializer(serializers.ModelSerializer):
     facility = FacilitySerializerMinimal(read_only=True)

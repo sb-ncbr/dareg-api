@@ -25,7 +25,8 @@ from .serializers import (
     SchemaSerializer,
     ProfileSerializer,
     ReservationSerializer,
-    InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer
+    InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer,
+    ProjectResponseSerializer
 )
 from .permissions import NestedPerms, update_perms, SameUser
 from rest_framework.exceptions import PermissionDenied
@@ -100,7 +101,9 @@ class SchemaViewSet(viewsets.ModelViewSet):
     serializer_class = SchemaSerializer
     permission_classes = []
 
-
+@extend_schema(
+    responses=ProjectResponseSerializer
+)
 class ProjectViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows project to be viewed or edited.
@@ -138,6 +141,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         serializer.save()
     
 @extend_schema(
+    request=DatasetSerializer,
     responses=DatasetResponseSerializer
 )
 class DatasetViewSet(viewsets.ModelViewSet):
@@ -189,6 +193,10 @@ class DatasetViewSet(viewsets.ModelViewSet):
         if old_dataset.name != request.data.get('name'):
             rename_entry(old_dataset.project, old_dataset.onedata_file_id, request.data.get('name'))
 
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
         return super().update(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
@@ -330,6 +338,37 @@ class InstrumentViewSet(viewsets.ModelViewSet):
 class ReservationListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    project_id = "8c718e41-c460-491e-bcb5-44e6179c0874"
+    reservations = [
+        {
+            "id": "b171517a-a79a-4170-bef5-ffe93519ba92",
+            "name": "Reservation 1",
+            "from_date": (datetime.now(timezone.utc) + timedelta(hours=-5)).isoformat(),
+            "to_date": (datetime.now(timezone.utc) + timedelta(hours=-3)).isoformat(),
+            "user": "David Konečný",
+            "description": "This is a test reservation",
+            "project_id": project_id
+        },
+        {
+            "id": "cee6d34b-991d-4691-b7da-c65f1fa17492",
+            "name": "Reservation 2",
+            "from_date": (datetime.now(timezone.utc) + timedelta(hours=-1)).isoformat(),
+            "to_date": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+            "user": "David Konečný",
+            "description": "This is a test reservation",
+            "project_id": project_id
+        },
+        {
+            "id": "1cb2a4dd-702c-4d92-a360-d649a230dc37",
+            "name": "Reservation 3",
+            "from_date": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+            "to_date": (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat(),
+            "user": "David Konečný",
+            "description": "This is a test reservation",
+            "project_id": project_id
+        }
+    ]
+
     @extend_schema(
         parameters=[
             OpenApiParameter(name='date_from', description='ISO formated FROM timestamp', required=True, type=str),
@@ -340,33 +379,6 @@ class ReservationListView(APIView):
         }
     )
     def get(self, request, *args, **kwargs):
-        reservations = [
-            {
-                "id": "b171517a-a79a-4170-bef5-ffe93519ba92",
-                "name": "Reservation 1",
-                "from_date": (datetime.now(timezone.utc) + timedelta(hours=-5)).isoformat(),
-                "to_date": (datetime.now(timezone.utc) + timedelta(hours=-3)).isoformat(),
-                "user": "David Konečný",
-                "description": "This is a test reservation"
-            },
-            {
-                "id": "cee6d34b-991d-4691-b7da-c65f1fa17492",
-                "name": "Reservation 2",
-                "from_date": (datetime.now(timezone.utc) + timedelta(hours=-1)).isoformat(),
-                "to_date": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
-                "user": "David Konečný",
-                "description": "This is a test reservation"
-            },
-            {
-                "id": "1cb2a4dd-702c-4d92-a360-d649a230dc37",
-                "name": "Reservation 3",
-                "from_date": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
-                "to_date": (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat(),
-                "user": "David Konečný",
-                "description": "This is a test reservation"
-            }
-        ]
-
         date_from = request.query_params.get("date_from") or datetime.now(timezone.utc).isoformat()
         date_to = request.query_params.get("date_to") or (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
 
@@ -375,7 +387,7 @@ class ReservationListView(APIView):
             date_to_parsed = datetime.fromisoformat(date_to)
 
             reservations = [
-                event for event in reservations
+                event for event in self.reservations
                 if datetime.fromisoformat(event["from_date"]) <= date_to_parsed and date_from_parsed <= datetime.fromisoformat(event["to_date"])
             ]
 
@@ -389,6 +401,24 @@ class ReservationListView(APIView):
             return Response({"error": "Invalid date format", "details": str(e)},
                             status=status.HTTP_400_BAD_REQUEST)
 
+
+class ReservationDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(response=ReservationSerializer(), description='Reservation details'),
+            404: OpenApiResponse(description='Reservation not found')
+        }
+    )
+    def get(self, request, id, *args, **kwargs):
+        try:
+            reservation = next((reservation for reservation in ReservationListView.reservations if reservation.get("id") == str(id)), None)
+            if reservation:
+                return Response(reservation, status=status.HTTP_200_OK)
+            return Response({"error": "Reservation not found"}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError:
+            return Response({"error": "Invalid reservation ID format"}, status=status.HTTP_400_BAD_REQUEST)
 
 class TempTokenAPIView(APIView):
     permission_classes = [IsAuthenticated]

@@ -261,6 +261,13 @@ class Tag(BaseModel):
 class MetadataExtractor(BaseModel):
     name = models.CharField("Name", max_length=200, unique=True)
 
+class DatasetStatus(StrEnum):
+    NEW = "new"
+    FINISHED = "finished"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
 
 class Dataset(PermsObject):
     project = models.ForeignKey(Project, models.PROTECT)
@@ -274,6 +281,7 @@ class Dataset(PermsObject):
     onedata_dataset_id = models.CharField("Onedata Dataset ID", max_length=512, null=True, blank=True)
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
     reservationId = models.CharField("Reservation ID", max_length=50, null=True, blank=True)
+    status = models.CharField(choices=DatasetStatus.choices(), default=DatasetStatus.NEW, max_length=20)
 
     def __str__(self):
         return f'{self.name}'
@@ -294,6 +302,7 @@ class ExperimentStatus(StrEnum):
     SYNCHRONIZING = "synchronizing"
     SUCCESS = "success"
     FAILURE = "failure"
+    DISCARDED = "discarded"
 
     @classmethod
     def choices(cls):
