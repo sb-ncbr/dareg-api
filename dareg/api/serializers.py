@@ -1,5 +1,4 @@
 from django.contrib.auth.models import User, Group
-from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
@@ -215,6 +214,12 @@ class ReservationSerializer(serializers.Serializer):
     user = serializers.CharField()
     description = serializers.CharField()
     project_id = serializers.CharField()
+    dataset_status = SerializerMethodField()
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_dataset_status(self, obj):
+        dataset = Dataset.objects.filter(reservationId=obj["id"]).first()
+        return dataset.status if dataset else None
 
 class InstrumentSerializer(serializers.ModelSerializer):
     facility = FacilitySerializerMinimal(read_only=True)
