@@ -337,8 +337,6 @@ class InstrumentViewSet(viewsets.ModelViewSet):
 
 class ReservationListView(APIView):
     permission_classes = [IsAuthenticated]
-
-    project_id = "8c718e41-c460-491e-bcb5-44e6179c0874"
     reservations = [
         {
             "id": "b171517a-a79a-4170-bef5-ffe93519ba92",
@@ -347,7 +345,6 @@ class ReservationListView(APIView):
             "to_date": (datetime.now(timezone.utc) + timedelta(hours=-3)).isoformat(),
             "user": "David Konečný",
             "description": "This is a test reservation",
-            "project_id": project_id
         },
         {
             "id": "cee6d34b-991d-4691-b7da-c65f1fa17492",
@@ -356,7 +353,6 @@ class ReservationListView(APIView):
             "to_date": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
             "user": "David Konečný",
             "description": "This is a test reservation",
-            "project_id": project_id
         },
         {
             "id": "1cb2a4dd-702c-4d92-a360-d649a230dc37",
@@ -365,7 +361,6 @@ class ReservationListView(APIView):
             "to_date": (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat(),
             "user": "David Konečný",
             "description": "This is a test reservation",
-            "project_id": project_id
         }
     ]
 
@@ -380,7 +375,11 @@ class ReservationListView(APIView):
     )
     def get(self, request, *args, **kwargs):
         date_from = request.query_params.get("date_from") or datetime.now(timezone.utc).isoformat()
-        date_to = request.query_params.get("date_to") or (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        date_to = request.query_params.get("date_to") or (datetime.now(timezone.utc) + timedelta(days=1)).isoforxmat()
+
+        project = request.user.instrument.facility.project_set.first()
+        for reservation in self.reservations:
+            reservation["project_id"] = str(project.id)
 
         try:
             date_from_parsed = datetime.fromisoformat(date_from)
@@ -414,6 +413,8 @@ class ReservationDetailView(APIView):
     def get(self, request, id, *args, **kwargs):
         try:
             reservation = next((reservation for reservation in ReservationListView.reservations if reservation.get("id") == str(id)), None)
+            project = request.user.instrument.facility.project_set.first()
+            reservation["project_id"] = str(project.id)
             if reservation:
                 return Response(reservation, status=status.HTTP_200_OK)
             return Response({"error": "Reservation not found"}, status=status.HTTP_404_NOT_FOUND)
