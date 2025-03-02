@@ -337,32 +337,6 @@ class InstrumentViewSet(viewsets.ModelViewSet):
 
 class ReservationListView(APIView):
     permission_classes = [IsAuthenticated]
-    reservations = [
-        {
-            "id": "b171517a-a79a-4170-bef5-ffe93519ba92",
-            "name": "Reservation 1",
-            "from_date": (datetime.now(timezone.utc) + timedelta(hours=-5)).isoformat(),
-            "to_date": (datetime.now(timezone.utc) + timedelta(hours=-3)).isoformat(),
-            "user": "David Konečný",
-            "description": "This is a test reservation",
-        },
-        {
-            "id": "cee6d34b-991d-4691-b7da-c65f1fa17492",
-            "name": "Reservation 2",
-            "from_date": (datetime.now(timezone.utc) + timedelta(hours=-1)).isoformat(),
-            "to_date": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
-            "user": "David Konečný",
-            "description": "This is a test reservation",
-        },
-        {
-            "id": "1cb2a4dd-702c-4d92-a360-d649a230dc37",
-            "name": "Reservation 3",
-            "from_date": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
-            "to_date": (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat(),
-            "user": "David Konečný",
-            "description": "This is a test reservation",
-        }
-    ]
 
     @extend_schema(
         parameters=[
@@ -376,9 +350,36 @@ class ReservationListView(APIView):
     def get(self, request, *args, **kwargs):
         date_from = request.query_params.get("date_from") or datetime.now(timezone.utc).isoformat()
         date_to = request.query_params.get("date_to") or (datetime.now(timezone.utc) + timedelta(days=1)).isoforxmat()
-
         project = request.user.instrument.facility.project_set.first()
-        for reservation in self.reservations:
+
+        reservations = [
+            {
+                "id": "b171517a-a79a-4170-bef5-ffe93519ba92",
+                "name": "Reservation 1",
+                "from_date": (datetime.now(timezone.utc) + timedelta(hours=-5)).isoformat(),
+                "to_date": (datetime.now(timezone.utc) + timedelta(hours=-3)).isoformat(),
+                "user": "David Konečný",
+                "description": "This is a test reservation",
+            },
+            {
+                "id": "cee6d34b-991d-4691-b7da-c65f1fa17492",
+                "name": "Reservation 2",
+                "from_date": (datetime.now(timezone.utc) + timedelta(hours=-1)).isoformat(),
+                "to_date": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+                "user": "David Konečný",
+                "description": "This is a test reservation",
+            },
+            {
+                "id": "1cb2a4dd-702c-4d92-a360-d649a230dc37",
+                "name": "Reservation 3",
+                "from_date": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+                "to_date": (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat(),
+                "user": "David Konečný",
+                "description": "This is a test reservation",
+            }
+        ]
+
+        for reservation in reservations:
             reservation["project_id"] = str(project.id)
 
         try:
@@ -386,7 +387,7 @@ class ReservationListView(APIView):
             date_to_parsed = datetime.fromisoformat(date_to)
 
             reservations = [
-                event for event in self.reservations
+                event for event in reservations
                 if datetime.fromisoformat(event["from_date"]) <= date_to_parsed and date_from_parsed <= datetime.fromisoformat(event["to_date"])
             ]
 
@@ -411,8 +412,35 @@ class ReservationDetailView(APIView):
         }
     )
     def get(self, request, id, *args, **kwargs):
+        reservations = [
+            {
+                "id": "b171517a-a79a-4170-bef5-ffe93519ba92",
+                "name": "Reservation 1",
+                "from_date": (datetime.now(timezone.utc) + timedelta(hours=-5)).isoformat(),
+                "to_date": (datetime.now(timezone.utc) + timedelta(hours=-3)).isoformat(),
+                "user": "David Konečný",
+                "description": "This is a test reservation",
+            },
+            {
+                "id": "cee6d34b-991d-4691-b7da-c65f1fa17492",
+                "name": "Reservation 2",
+                "from_date": (datetime.now(timezone.utc) + timedelta(hours=-1)).isoformat(),
+                "to_date": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+                "user": "David Konečný",
+                "description": "This is a test reservation",
+            },
+            {
+                "id": "1cb2a4dd-702c-4d92-a360-d649a230dc37",
+                "name": "Reservation 3",
+                "from_date": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+                "to_date": (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat(),
+                "user": "David Konečný",
+                "description": "This is a test reservation",
+            }
+        ]
+
         try:
-            reservation = next((reservation for reservation in ReservationListView.reservations if reservation.get("id") == str(id)), None)
+            reservation = next((reservation for reservation in reservations if reservation.get("id") == str(id)), None)
             project = request.user.instrument.facility.project_set.first()
             reservation["project_id"] = str(project.id)
             if reservation:
