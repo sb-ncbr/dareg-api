@@ -173,10 +173,25 @@ def create_new_experiment(dataset: Dataset, experiment_id: str):
     except Exception as e:
         error = {"error": f"Failed to create the dataset. {e}"}
 
+    try:
+        print(f"Setting permissions for the experiment {experiment_id} to 0645", flush=True)
+        url = f"{oneprovider_configuration.host}/data/{new_file.file_id}"
+        headers = {
+            "X-Auth-Token": oneprovider_configuration.api_key['X-Auth-Token'],
+            "Content-Type": "application/json"
+        }
+        data = {
+            "mode": "0645"
+        }
+        print(f"PUT {url} {headers} {data}", flush=True)
+        response = requests.put(url, headers=headers, json=data)
+    except Exception as e:
+        error = {"error": f"Failed to set permissions for the dataset. {e} {response.text}"}
+        print(f"Failed to set permissions for the dataset. {e} {response.text}", flush=True)
+
     return new_file, error
 
 
-# TODO: replace with https://github.com/CERIT-SC/onedata-libs/blob/main/onezone_client/docs/TokenApi.md#create_temporary_token_for_current_user
 def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = facility.onedata_provider_url
