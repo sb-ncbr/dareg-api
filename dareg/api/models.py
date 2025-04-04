@@ -279,6 +279,7 @@ class Dataset(PermsObject):
     onedata_file_id = models.CharField("Onedata File ID", max_length=512, null=True, blank=True)
     onedata_share_id = models.CharField("Onedata Default Share ID", max_length=512, null=True, blank=True)
     onedata_dataset_id = models.CharField("Onedata Dataset ID", max_length=512, null=True, blank=True)
+    onedata_space_id = models.CharField("Onedata Space ID", max_length=512, null=True, blank=True)
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
     reservationId = models.CharField("Reservation ID", max_length=50, null=True, blank=True)
     status = models.CharField(choices=DatasetStatus.choices(), default=DatasetStatus.NEW, max_length=20)
@@ -288,7 +289,8 @@ class Dataset(PermsObject):
   
     @property
     def onedata_visit_id(self):
-        to_base64 = f"guid#{self.onedata_dataset_id}#{self.project.onedata_space_id}"
+        space_id = self.onedata_space_id if self.onedata_space_id else self.project.onedata_space_id
+        to_base64 = f"guid#{self.onedata_dataset_id}#{space_id}"
         return base64.b64encode(to_base64.encode())
     
     class Meta:
