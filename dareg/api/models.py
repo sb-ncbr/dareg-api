@@ -293,6 +293,10 @@ class Dataset(PermsObject):
         to_base64 = f"guid#{self.onedata_dataset_id}#{space_id}"
         return base64.b64encode(to_base64.encode())
     
+    @property
+    def onedata_space_id(self):
+        return self.onedata_space_id if self.onedata_space_id else self.project.onedata_space_id
+    
     class Meta:
         unique_together = ("project", "name")
 

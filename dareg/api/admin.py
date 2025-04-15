@@ -150,7 +150,7 @@ class DatasetAdmin(BaseModelAdmin):
     def onedata_link(self, obj):
         if obj.onedata_visit_id == "":
             return 'No visit folder'
-        return format_html(f"<a href=\"https://{ONEZONE_HOST}/ozw/onezone/i#/onedata/spaces/{obj.project.onedata_space_id}/data?options=dir.{obj.onedata_visit_id.decode()}\">Visit folder {obj.name}</a>")
+        return format_html(f"<a href=\"https://{ONEZONE_HOST}/ozw/onezone/i#/onedata/spaces/{obj.onedata_space_id}/data?options=dir.{obj.onedata_visit_id.decode()}\">Visit folder {obj.name}</a>")
     onedata_link.short_description = 'OneData Folder'
 
     def onedata_share_link(self, obj):
