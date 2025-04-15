@@ -25,7 +25,7 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
-if os.environ["DJANGO_DEBUG"].title() == "True":
+if os.environ["DJANGO_DEBUG"].lower() == "true":
     DEBUG = True
 
 ALLOWED_HOSTS = os.environ["DJANGO_ALLOWED_HOSTS"].split()
@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "mozilla_django_oidc",
+    'knox',
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     "api",
     "datacite_api",
     'guardian',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -168,6 +170,7 @@ LOGOUT_REDIRECT_URL = os.environ["OIDC_LOGOUT_REDIRECT_URL"]
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "mozilla_django_oidc.contrib.drf.OIDCAuthentication",
+        "knox.auth.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     # Use Django's standard `django.contrib.auth` permissions,
@@ -179,6 +182,7 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_PAGINATION_CLASS": "api.backends.CustomPagination",
     "PAGE_SIZE": 100,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # Django Debug Toolbar
@@ -201,6 +205,13 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
+}
+
+REST_KNOX = {
+    "TOKEN_TTL": None,
+    "AUTO_REFRESH": True,
+    "TOKEN_LIMIT_PER_USER": 10,
+    "TOKEN_CHARACTER_LENGTH": 64,
 }
 
 # Logging
@@ -227,7 +238,7 @@ if DEBUG:
             "loggers": {
                 # root logger
                 "": {
-                    "level": "ERROR",
+                    "level": "INFO",
                     "handlers": ["console"],
                 },
             },

@@ -1,12 +1,15 @@
 import base64
 import hashlib
 import os
-import string
 import uuid
 import datetime
+from enum import StrEnum
+
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from django.contrib.auth.models import User, Group, Permission
+from django.dispatch import receiver
+from django.db.models.signals import post_save, post_delete
 from django.conf import settings
 from guardian.shortcuts import assign_perm
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -58,6 +61,11 @@ class BaseModel(TimeStampedModel):
         abstract = True
 
 
+def is_stronger_perm(perm1, perm2):
+    permission_hierarchy = {"none": 0, "viewer": 1, "editor": 2, "owner": 3}
+    return permission_hierarchy[perm1] > permission_hierarchy[perm2]
+
+
 class PermsObject(BaseModel):
     """
     Objects for which permissions are managed. 
@@ -69,17 +77,23 @@ class PermsObject(BaseModel):
 
         # Creating PermsGroup for new PermsObject
         if not PermsGroup.objects.filter(name=f"{self.id}_owner").exists():
-
             ownerGroup = PermsGroup.objects.create(name=f"{self.id}_owner", content_object=self, role=PermsGroup.OWNER)
-            PermsGroup.objects.create(name=f"{self.id}_editor", content_object=self, role=PermsGroup.EDITOR)
-            PermsGroup.objects.create(name=f"{self.id}_viewer", content_object=self, role=PermsGroup.VIEWER)
-
             # add user who created the object to owners
+            ownerGroup.save()
+
             ownerGroup.user_set.add(self.created_by)
+
+        
+        if not PermsGroup.objects.filter(name=f"{self.id}_editor").exists():
+            PermsGroup.objects.create(name=f"{self.id}_editor", content_object=self, role=PermsGroup.EDITOR)
+
+        if not PermsGroup.objects.filter(name=f"{self.id}_viewer").exists():
+            PermsGroup.objects.create(name=f"{self.id}_viewer", content_object=self, role=PermsGroup.VIEWER)
         
     def max_perm(self, request, current_perm="none"):
 
         higher_level = {
+            "experiment": Dataset,
             "dataset": Project,
             "project": Facility,
             "facility": None
@@ -90,7 +104,7 @@ class PermsObject(BaseModel):
             if x == current_perm:
                 break
             
-            if request.user.has_perm(f"{x[1]}_{self.__class__.__name__.lower()}", self):
+            if self.is_permission_stronger(current_perm, request, x):
                 current_perm = x[0]
                 break
         
@@ -102,7 +116,11 @@ class PermsObject(BaseModel):
         obj = getattr(self, upper_obj.__name__.lower())
         
         return obj.max_perm(request, current_perm)
-    
+
+    def is_permission_stronger(self, current_perm, request, x):
+        return request.user.has_perm(f"{x[1]}_{self.__class__.__name__.lower()}", self) and is_stronger_perm(x[0],
+                                                                                                             current_perm)
+
     def perm_atleast(self, request, role):
         perm = self.max_perm(request)
         match role:
@@ -176,6 +194,7 @@ class Facility(PermsObject):
     abbreviation = models.CharField("Abbreviation", max_length=20, unique=True)
     web = models.URLField("Web", max_length=200, blank=True)
     email = models.EmailField("Email", max_length=200, blank=True)
+    logo = models.URLField("Logo", blank=True, max_length=200)
     onedata_token = models.CharField("Onedata Secret token", max_length=512, blank=True)
     onedata_provider_url = models.URLField("Onedata provider URL", max_length=200, blank=True)
 
@@ -183,7 +202,22 @@ class Facility(PermsObject):
         verbose_name_plural = "Facilities"
 
     def __str__(self):
-                return f'{self.name}'
+        return f'{self.name}'
+
+class Instrument(PermsObject):
+    facility = models.ForeignKey(Facility, models.PROTECT)
+    name = models.CharField("Name", max_length=200)
+    method = models.CharField("Method", max_length=500)
+    support = models.CharField("Support", max_length=500)
+    contact = models.CharField("Contact", max_length=500)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, models.PROTECT)
+    default_data_dir = models.CharField("Default data directory", max_length=1024, default="/data")
+
+    class Meta:
+        unique_together = ("facility", "name")
+
+    def __str__(self):
+        return f'{self.name}'
 
 class Schema(BaseModel):
     version = models.PositiveIntegerField("Version", default=1)
@@ -227,6 +261,13 @@ class Tag(BaseModel):
 class MetadataExtractor(BaseModel):
     name = models.CharField("Name", max_length=200, unique=True)
 
+class DatasetStatus(StrEnum):
+    NEW = "new"
+    FINISHED = "finished"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
 
 class Dataset(PermsObject):
     project = models.ForeignKey(Project, models.PROTECT)
@@ -238,18 +279,45 @@ class Dataset(PermsObject):
     onedata_file_id = models.CharField("Onedata File ID", max_length=512, null=True, blank=True)
     onedata_share_id = models.CharField("Onedata Default Share ID", max_length=512, null=True, blank=True)
     onedata_dataset_id = models.CharField("Onedata Dataset ID", max_length=512, null=True, blank=True)
+    onedata_space_id = models.CharField("Onedata Space ID", max_length=512, null=True, blank=True)
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
+    reservationId = models.CharField("Reservation ID", max_length=50, null=True, blank=True)
+    status = models.CharField(choices=DatasetStatus.choices(), default=DatasetStatus.NEW, max_length=20)
 
     def __str__(self):
         return f'{self.name}'
   
     @property
     def onedata_visit_id(self):
-        to_base64 = f"guid#{self.onedata_dataset_id}#{self.project.onedata_space_id}"
+        space_id = self.onedata_space_id if self.onedata_space_id else self.project.onedata_space_id
+        to_base64 = f"guid#{self.onedata_dataset_id}#{space_id}"
         return base64.b64encode(to_base64.encode())
     
     class Meta:
         unique_together = ("project", "name")
+
+
+class ExperimentStatus(StrEnum):
+    NEW = "new"
+    PREPARED = "prepared"
+    RUNNING = "running"
+    SYNCHRONIZING = "synchronizing"
+    SUCCESS = "success"
+    FAILURE = "failure"
+    DISCARDED = "discarded"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
+class Experiment(PermsObject):
+    dataset = models.ForeignKey(Dataset, models.PROTECT)
+    name = models.CharField("Name", max_length=200, blank=True)
+    start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True)
+    end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True)
+    note = models.CharField("Note", max_length=500, blank=True)
+    status = models.CharField(choices=ExperimentStatus.choices(), default=ExperimentStatus.NEW, max_length=20)
+    onedata_file_id = models.CharField("Onedata File ID", max_length=512, null=True, blank=True)
 
 class Language(models.Model):
     name = models.CharField("Name", max_length=200, unique=True)
@@ -301,6 +369,28 @@ class UserProfile(BaseModel):
     @property
     def last_login(self):
         return self.user.last_login
+
+    def __str__(self):
+        return f'{self.full_name}'
+    
+    @receiver(post_save, sender=User)
+    def create_profile(sender, instance, created, **kwargs):
+        try:
+            if created:
+                UserProfile.objects.create(user=instance, full_name=f'{instance.first_name} {instance.last_name}').save()
+            else:
+                if instance.userprofile.full_name == "":
+                    instance.userprofile.full_name = f'{instance.first_name} {instance.last_name}'
+                    instance.userprofile.save()
+        except Exception as err:
+            print(f'Error creating user profile!\n{err}')
+
+    @receiver(post_delete, sender=User)
+    def save_profile(sender, instance, **kwargs):
+        try:
+            instance.userprofile.delete()
+        except Exception as err:
+            print(f'Error saving user profile!\n{err}')
 
     def __str__(self):
         return f'{self.full_name}'

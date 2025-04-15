@@ -25,8 +25,21 @@ services:
     #   - postgres
     ports:
       - 8083:8080
-    volumes:
-      - ./dareg/:/srv/dareg
+    develop:
+      watch:
+        - path: ./dareg
+          action: sync
+          target: /srv/dareg
+          ignore:
+            - .git
+            - .gitignore
+            - .gitlab
+            - .gitlab-ci.yml
+            - .dockerignore
+            - backend
+            - .venv
+            - .vscode
+
     environment:
       # In production mode requests are served by Gunicorn webserver
       PRODUCTION: false

@@ -1,6 +1,11 @@
 from django.contrib.auth.models import User, Group
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile
+from rest_framework.fields import SerializerMethodField
+
+from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
+    ExperimentStatus
+
 
 class UserSerializerMinimal(serializers.ModelSerializer):
 
@@ -125,7 +130,7 @@ class SchemaSerializer(serializers.ModelSerializer):
 class FacilitySerializerMinimal(serializers.ModelSerializer):
     class Meta:
         model = Facility
-        fields = BaseModelSerializer.Meta.fields + ["abbreviation"]
+        fields = BaseModelSerializer.Meta.fields + ["abbreviation", "email", "web", "logo"]
 
 class ProjectResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
     facility = FacilitySerializerMinimal(read_only=True)
@@ -153,11 +158,28 @@ class ProjectSerializer(serializers.ModelSerializer):
         return Project.objects.create(**validated_data)
 
 
+class ExperimentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Experiment
+        fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Experiment.objects.create(**validated_data)
+
+
 class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer, PermsModelSerializer):
     project = BaseModelSerializer(read_only=True)
+    experiments = SerializerMethodField()
     dataset_schema = BaseModelSerializer(read_only=True)
     created_by = UserSerializerMinimal(read_only=True)
     modified_by = UserSerializerMinimal(read_only=True)
+
+    @extend_schema_field(ExperimentSerializer(many=True))
+    def get_experiments(self, obj):
+        return ExperimentSerializer(obj.experiment_set.exclude(status=ExperimentStatus.DISCARDED).order_by('created'), many=True, required=True).data
 
     onedata_visit_id = serializers.SerializerMethodField(source='onedata_visit_id')
 
@@ -183,3 +205,30 @@ class DatasetSerializer(serializers.ModelSerializer):
 
         return Dataset.objects.create(**validated_data)
 
+
+class ReservationSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    name = serializers.CharField()
+    from_date = serializers.DateTimeField()
+    to_date = serializers.DateTimeField()
+    user = serializers.CharField()
+    description = serializers.CharField()
+    project_id = serializers.CharField()
+    dataset_status = SerializerMethodField()
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_dataset_status(self, obj):
+        dataset = Dataset.objects.filter(reservationId=obj["id"]).first()
+        return dataset.status if dataset else None
+
+class InstrumentSerializer(serializers.ModelSerializer):
+    facility = FacilitySerializerMinimal(read_only=True)
+    class Meta:
+        model = Instrument
+        fields = ["id", "name", "support", "contact", "method", "facility", "default_data_dir"]
+
+
+class TempTokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    provider_url = serializers.CharField()
+    one_data_directory_id = serializers.CharField()
