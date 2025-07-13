@@ -4,7 +4,7 @@ from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
 
 from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
-    ExperimentStatus
+    ExperimentStatus, WorkflowTemplate
 
 
 class UserSerializerMinimal(serializers.ModelSerializer):
@@ -232,3 +232,14 @@ class TempTokenSerializer(serializers.Serializer):
     token = serializers.CharField()
     provider_url = serializers.CharField()
     one_data_directory_id = serializers.CharField()
+
+class WorkflowTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowTemplate
+        fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Experiment.objects.create(**validated_data)

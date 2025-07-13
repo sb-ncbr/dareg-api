@@ -13,7 +13,8 @@ from .models import (
     Dataset,
     Schema,
     Language,
-    UserProfile, Instrument, Experiment
+    UserProfile, Instrument, Experiment,
+    WorkflowTemplate
 )
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset
 from django.contrib.auth.models import User, Group
@@ -292,6 +293,11 @@ class UserAdmin(BaseUserAdmin):
     
     inlines = [UserProfileInline]
 
+class WorkflowTemplateAdmin(BaseModelAdmin):
+    list_display = BaseModelAdmin.list_display
+    search_fields = ('name', 'status')
+
+
 def _change_group_display_name(group: Group) -> str:
     try:
         g = PermsGroup.objects.get(id=group.id)
@@ -365,3 +371,4 @@ admin.site.register(Language)
 
 admin.site.unregister(AuthToken)
 admin.site.register(AuthToken, AuthTokenAdmin)
+admin.site.register(WorkflowTemplate, WorkflowTemplateAdmin)

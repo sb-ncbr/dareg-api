@@ -140,7 +140,6 @@ class PermsObject(BaseModel):
     class Meta:
         abstract = True
 
-
 class PermsGroup(Group):
     """
     The group we use to control user permissions to PermsObjects. 
@@ -408,3 +407,56 @@ class UserProfile(BaseModel):
 
     def __str__(self):
         return f'{self.full_name}'
+    
+class WorkflowTemplate(PermsObject):
+    project_id = models.ForeignKey(Project, models.PROTECT)
+    workflow_id = models.CharField("Workflow ID", max_length=200, unique=True)
+    name = models.CharField("Name", max_length=200, blank=True)
+    description = models.CharField("Description", max_length=500, blank=True)
+    revision = models.DecimalField("Revision", max_digits=10, decimal_places=0, default=1)
+    input_params = models.JSONField("JSON", default=dict, blank=True)
+
+class JobStatus(StrEnum):
+    NEW = "new"
+    PREPARED = "prepared"
+    RUNNING = "running"
+    SYNCHRONIZING = "synchronizing"
+    SUCCESS = "success"
+    FAILURE = "failure"
+    DISCARDED = "discarded"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+    
+class JobLogLevel(StrEnum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+    
+class Job(PermsObject):
+    workflow_temaplate_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
+    workflow_id = models.CharField("Workflow ID", max_length=200, unique=True)
+    object_id = models.UUIDField(
+        editable=False,
+        help_text="Object id",
+        null=True,
+    )
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="Content type of the model",
+        null=True,
+    )
+    content_object = GenericForeignKey('content_type', 'object_id')
+    name = models.CharField("Name", max_length=200, blank=True)
+    description = models.CharField("Description", max_length=500, blank=True)
+    status = models.CharField(choices=JobStatus.choices(), default=JobStatus.NEW, max_length=20)
+    input_params = models.JSONField("JSON", default=dict, blank=True)
+    start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True)
+    end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True)
+    log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20)    

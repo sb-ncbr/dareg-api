@@ -15,8 +15,8 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
 
-from ..models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment
-from ..serializers import (
+from .models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
+from .serializers import (
     UserSerializer,
     GroupSerializer,
     FacilitySerializer,
@@ -26,7 +26,8 @@ from ..serializers import (
     ProfileSerializer,
     ReservationSerializer,
     InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer,
-    ProjectResponseSerializer
+    ProjectResponseSerializer,
+    WorkflowTemplateSerializer
 )
 from ..permissions import NestedPerms, update_perms, SameUser
 from rest_framework.exceptions import PermissionDenied
@@ -469,3 +470,9 @@ class TempTokenAPIView(APIView):
         if serializer.is_valid():
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WorkflowTemplateViewSet(viewsets.ModelViewSet):
+    queryset = WorkflowTemplate.objects.all()
+    serializer_class = WorkflowTemplateSerializer
+    permission_classes = [NestedPerms, IsAuthenticated]
