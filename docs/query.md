@@ -1,7 +1,7 @@
 ## Generic Search API
 
 ### Endpoint
-`POST /api/query/`
+`POST /api/v1/query/`
 
 ### Description
 Search across registered models using trigram similarity or metadata filters. Returns paginated results with highlights.
