@@ -6,6 +6,10 @@ from django.db import migrations, models
 import django.db.models.deletion
 import django_extensions.db.fields
 import uuid
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class Migration(migrations.Migration):
@@ -17,10 +21,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='dataset',
-            name='onedata_space_id',
-        ),
         migrations.CreateModel(
             name='WorkflowTemplate',
             fields=[

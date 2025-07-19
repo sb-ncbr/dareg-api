@@ -4,6 +4,7 @@ import os
 import uuid
 import datetime
 from enum import StrEnum
+import logging
 
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
@@ -26,7 +27,7 @@ from django.contrib.contenttypes.models import ContentType
 # pyma graph_models --exclude-models TimeStampedModel,BaseModel,User --pydot --arrow-shape normal --disable-abstract-fields --color-code-deletions -o dareg.png api
 # pyma graph_models api --all-applications --group-models --pydot --arrow-shape normal --color-code-deletions -o dareg_full.png
 ##
-
+logger = logging.getLogger(__name__)
 
 class BaseModel(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -178,6 +179,7 @@ class PermsGroup(Group):
         class_name = self.content_object._meta.verbose_name.lower()
 
         if self.role == self.OWNER:
+            logger.info(f"Assigning permission: delete_{class_name}, group: {self}, object: {self.content_object}")
             assign_perm(f"delete_{class_name}", self, self.content_object)
         
         if self.role == self.OWNER or self.role == self.EDITOR:
@@ -415,6 +417,35 @@ class WorkflowTemplate(PermsObject):
     description = models.CharField("Description", max_length=500, blank=True)
     revision = models.DecimalField("Revision", max_digits=10, decimal_places=0, default=1)
     input_params = models.JSONField("JSON", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "workflowtemplate"
+        verbose_name_plural = "workflowtemplates"
+    
+    def clean(self):
+        if True:
+            logger.info("Creating a new workflow template")
+            # Verify that the workflow with id workflow_id exists in onedata
+            workflow_id = self.id
+            
+            """ Verify the workflow has inputsTemplate in schema like:
+            # {
+            #  "inputFile": "store_id",
+            #  "outputFile": "store_id",
+            #  "appConfig": "store_id"
+            # }
+            """
+            # log verifying inputsTemplate
+            logger.info(f"Verifying inputsTemplate for workflow with id {workflow_id} in onedata")
+            assert self.input_params is not None, "'inputsTemplate' is missing in schema"
+            required_keys = {"inputFile", "outputFile", "appConfig"}
+            assert required_keys.issubset(self.input_params.keys()), \
+                f"'inputsTemplate' must contain keys: {required_keys}"
+            for key in required_keys:
+                assert isinstance(self.input_params[key], str), f"{key} must be a string (store_id)"
+            logger.info(f"InputsTemplate for workflow with id {workflow_id} is valid")
+        else:
+            raise PermissionDenied({"detail": "You do not have permissions to create a new workflow template."})
 
 class JobStatus(StrEnum):
     NEW = "new"

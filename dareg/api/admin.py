@@ -2,6 +2,7 @@ from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 from typing import Any
 from django.contrib import admin
+import logging
 
 from django.urls import reverse
 from onedata_wrapper.models.filesystem.entry_request import EntryRequest
@@ -30,6 +31,7 @@ from knox.models import AuthTokenManager
 from django.utils import timezone
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
+logger = logging.getLogger(__name__)
 
 class TimeStampFilter(admin.SimpleListFilter):
         title = 'Date and time'
@@ -294,7 +296,7 @@ class UserAdmin(BaseUserAdmin):
     inlines = [UserProfileInline]
 
 class WorkflowTemplateAdmin(BaseModelAdmin):
-    list_display = BaseModelAdmin.list_display
+    list_display = ('name',) + BaseModelAdmin.list_display
     search_fields = ('name', 'status')
 
 

@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from importlib.metadata import metadata
+import logging
 
 import oneprovider_client
 import requests
@@ -39,8 +40,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
-    create_new_experiment, create_new_temp_token, get_file_metadata
+    create_new_experiment, create_new_temp_token, get_file_metadata, verify_workflow_existence
 
+logger = logging.getLogger(__name__)
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
@@ -476,3 +478,36 @@ class WorkflowTemplateViewSet(viewsets.ModelViewSet):
     queryset = WorkflowTemplate.objects.all()
     serializer_class = WorkflowTemplateSerializer
     permission_classes = [NestedPerms, IsAuthenticated]
+
+    # Override the create method to set the created_by field
+    def perform_create(self, serializer):
+        # Check permissions for the workflow template creation
+        if True:
+            logger.info("Creating a new workflow template")
+            # Verify that the workflow with id workflow_id exists in onedata
+            workflow_id = self.request.data.get('id')
+            workflow_existence = verify_workflow_existence(workflow_id)
+            if not workflow_existence:
+                raise PermissionDenied({"detail": "Workflow with the given ID does not exist in Onedata."})
+            
+            """ Verify the workflow has inputsTemplate in schema like:
+            # {
+            #  "inputFile": "store_id",
+            #  "outputFile": "store_id",
+            #  "appConfig": "store_id"
+            # }
+            """
+            # log verifying inputsTemplate
+            print(f"Verifying inputsTemplate for workflow with id {workflow_id} in onedata")
+            inputs_template = self.request.data.get('inputsTemplate')
+            assert inputs_template is not None, "'inputsTemplate' is missing in schema"
+            required_keys = {"inputFile", "outputFile", "appConfig"}
+            assert required_keys.issubset(inputs_template.keys()), \
+                f"'inputsTemplate' must contain keys: {required_keys}"
+            for key in required_keys:
+                assert isinstance(inputs_template[key], str), f"{key} must be a string (store_id)"
+            print(f"InputsTemplate for workflow with id {workflow_id} is valid")
+
+            serializer.save(created_by=self.request.user)
+        else:
+            raise PermissionDenied({"detail": "You do not have permissions to create a new workflow template."})

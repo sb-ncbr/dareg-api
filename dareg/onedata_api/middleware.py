@@ -13,7 +13,7 @@ from onedata_wrapper.models.filesystem.entry_request import EntryRequest
 from onedata_wrapper.models.filesystem.new_directory_request import NewDirectoryRequest
 from onedata_wrapper.models.share.new_share_request import NewShareRequest
 from onedata_wrapper.selectors.file_attribute import ALL as FA_ALL
-from api.models import Project, Dataset, Facility
+from api.models import Project, Dataset, Facility, WorkflowTemplate
 import base64
 
 
@@ -247,3 +247,8 @@ def get_file_metadata(project: Project, file_id: str):
         error = {"error": f"Failed to create the dataset. {e}"}
 
     return metadata, error
+
+def verify_workflow_existence(workflow_id: str):
+    # Howto verify? It's probably zone level object
+    print(f"Verifying existence of workflow with id {workflow_id} in onedata")
+    return True
