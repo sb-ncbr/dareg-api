@@ -2,7 +2,9 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 from rest_framework import routers
-from api import views
+from api.views import views
+from api.views.query import GeneralSearchViewSet
+from api.views.schemas import SchemaMetadataFieldsView
 from onedata_api.urls import urlpatterns as onedata_router
 from datacite_api.urls import urlpatterns as datacite_router
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -18,9 +20,11 @@ router.register(r"schemas", views.SchemaViewSet)
 router.register(r"profile", views.ProfileViewSet, basename='profile')
 router.register(r"instrument", views.InstrumentViewSet, basename='instrument')
 router.register(r"experiments", views.ExperimentViewSet, basename='experiment')
+router.register(r'query', GeneralSearchViewSet, basename='query')
 
 urlpatterns = [
     path("api/v1/", include(router.urls)),
+    path("api/v1/schemas/<uuid:schema_id>/fields/", SchemaMetadataFieldsView.as_view(), name="schema-fields"),
     path("onedata-api/v1/", include(onedata_router)),
     path("datacite-api/v1/", include(datacite_router)),
     path("", RedirectView.as_view(url="api/v1", permanent=True)),

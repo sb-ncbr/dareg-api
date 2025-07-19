@@ -15,8 +15,8 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
 
-from .models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment
-from .serializers import (
+from ..models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment
+from ..serializers import (
     UserSerializer,
     GroupSerializer,
     FacilitySerializer,
@@ -28,7 +28,7 @@ from .serializers import (
     InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer,
     ProjectResponseSerializer
 )
-from .permissions import NestedPerms, update_perms, SameUser
+from ..permissions import NestedPerms, update_perms, SameUser
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
@@ -277,7 +277,6 @@ class DatasetViewSet(viewsets.ModelViewSet):
         metadata, error = get_file_metadata(project, request.data.get("onedata_file_id"))
 
         return super().create(request, *args, **kwargs)
-
 
 class ExperimentViewSet(viewsets.ModelViewSet):
     """

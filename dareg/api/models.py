@@ -203,6 +203,8 @@ class Facility(PermsObject):
 
     def __str__(self):
         return f'{self.name}'
+    
+    trigram_search_fields = ["name", "abbreviation", "web", "email"]
 
 class Instrument(PermsObject):
     facility = models.ForeignKey(Facility, models.PROTECT)
@@ -226,6 +228,8 @@ class Schema(BaseModel):
     schema = models.JSONField(default=dict)
     uischema = models.JSONField(default=dict)
 
+    trigram_search_fields = ["name", "description"]
+
     class Meta:
         unique_together = ("name", "version")
 
@@ -246,6 +250,8 @@ class Project(PermsObject):
     )
     onedata_space_id = models.CharField("Onedata space ID", max_length=200, blank=True)
 
+    trigram_search_fields = ["name", "description"]
+    
     class Meta:
         unique_together = ("facility", "name")
 
@@ -284,6 +290,8 @@ class Dataset(PermsObject):
     reservationId = models.CharField("Reservation ID", max_length=50, null=True, blank=True)
     status = models.CharField(choices=DatasetStatus.choices(), default=DatasetStatus.NEW, max_length=20)
 
+    trigram_search_fields = ["name", "description"]
+
     def __str__(self):
         return f'{self.name}'
   
@@ -295,8 +303,8 @@ class Dataset(PermsObject):
     
     @property
     def onedata_space_id(self):
-        return self.onedata_space_id if self.onedata_space_id else self.project.onedata_space_id
-    
+        return self.__dict__.get("onedata_space_id") or self.project.onedata_space_id
+
     class Meta:
         unique_together = ("project", "name")
 
@@ -322,6 +330,8 @@ class Experiment(PermsObject):
     note = models.CharField("Note", max_length=500, blank=True)
     status = models.CharField(choices=ExperimentStatus.choices(), default=ExperimentStatus.NEW, max_length=20)
     onedata_file_id = models.CharField("Onedata File ID", max_length=512, null=True, blank=True)
+
+    trigram_search_fields = ["name", "note"]
 
 class Language(models.Model):
     name = models.CharField("Name", max_length=200, unique=True)
