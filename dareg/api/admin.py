@@ -9,6 +9,7 @@ from onedata_wrapper.models.filesystem.entry_request import EntryRequest
 
 from .models import (
     Facility,
+    Job,
     PermsGroup,
     Project,
     Dataset,
@@ -29,6 +30,7 @@ from knox.settings import CONSTANTS, knox_settings
 from knox.models import AuthToken
 from knox.models import AuthTokenManager
 from django.utils import timezone
+from .utility import send_job, verify_job
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
 logger = logging.getLogger(__name__)
@@ -299,6 +301,20 @@ class WorkflowTemplateAdmin(BaseModelAdmin):
     list_display = ('name',) + BaseModelAdmin.list_display
     search_fields = ('name', 'status')
 
+class JobAdmin(BaseModelAdmin):
+    list_display = ('name',) + BaseModelAdmin.list_display
+    search_fields = ('name', 'status')
+
+    def save_model(self, request, obj, form, change):
+        logger.info("Verifying job in admin save_model")
+        verify_job(obj)
+        logger.info(f"Saving job with id {obj.id if obj.id else 'new'}")
+        if not change:
+            obj.created_by = request.user
+        obj.modified_by = request.user
+        send_job(obj)
+        obj.save()
+
 
 def _change_group_display_name(group: Group) -> str:
     try:
@@ -374,3 +390,4 @@ admin.site.register(Language)
 admin.site.unregister(AuthToken)
 admin.site.register(AuthToken, AuthTokenAdmin)
 admin.site.register(WorkflowTemplate, WorkflowTemplateAdmin)
+admin.site.register(Job, JobAdmin)

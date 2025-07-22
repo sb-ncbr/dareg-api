@@ -471,23 +471,59 @@ class JobLogLevel(StrEnum):
     
 class Job(PermsObject):
     workflow_temaplate_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
-    workflow_id = models.CharField("Workflow ID", max_length=200, unique=True)
-    object_id = models.UUIDField(
-        editable=False,
-        help_text="Object id",
-        null=True,
-    )
+    workflow_id = models.CharField("Workflow ID", max_length=200)
+    # Generic relation to Project, Dataset, or Experiment
     content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
-        help_text="Content type of the model",
+        help_text="Content type of the related object (Project, Dataset, or Experiment)",
         null=True,
+        blank=True,
+    )
+    object_id = models.UUIDField(
+        help_text="ID of the related object (Project, Dataset, or Experiment)",
+        null=True,
+        blank=True,
     )
     content_object = GenericForeignKey('content_type', 'object_id')
-    name = models.CharField("Name", max_length=200, blank=True)
+    name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500, blank=True)
-    status = models.CharField(choices=JobStatus.choices(), default=JobStatus.NEW, max_length=20)
-    input_params = models.JSONField("JSON", default=dict, blank=True)
-    start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True)
-    end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True)
-    log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20)    
+    status = models.CharField(choices=JobStatus.choices(), default=JobStatus.NEW, max_length=20, editable=False)
+    input_params = models.JSONField("JSON", default=dict)
+    start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True, editable=False)
+    end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True, editable=False)
+    log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20, blank=True)
+
+
+    def clean(self):
+        # Enforce that content_type is only Experiment, Dataset, or Project
+        allowed_models = {"experiment", "dataset", "project"}
+        model_name = self.content_type.model
+        if model_name not in allowed_models:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({
+                "content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
+            })
+
+        # Check permissions for the workflow template creation
+    
+# create a class that represents job input parameters inputFile, outputFile, 
+class JobParams:
+    def __init__(self, inputFile: str, outputFile: str, appConfig: str):
+        if not inputFile or not isinstance(inputFile, str) or not inputFile.strip():
+            raise ValueError("inputFile must be a non-empty string")
+        if not outputFile or not isinstance(outputFile, str) or not outputFile.strip():
+            raise ValueError("outputFile must be a non-empty string")
+        if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
+            raise ValueError("appConfig must be a non-empty string")
+        self.inputFile = inputFile
+        self.outputFile = outputFile
+        self.appConfig = appConfig
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            inputFile=data.get('inputFile'),
+            outputFile=data.get('outputFile'),
+            appConfig=data.get('appConfig')
+        )

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from http.client import responses
+import logging
 
 import requests
 import oneprovider_client
@@ -16,7 +17,7 @@ from onedata_wrapper.selectors.file_attribute import ALL as FA_ALL
 from api.models import Project, Dataset, Facility, WorkflowTemplate
 import base64
 
-
+logger = logging.getLogger(__name__)
 
 def create_public_share(project: Project, dataset_name: str, dataset_description: str, file_entry: FileEntry):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
@@ -239,7 +240,8 @@ def get_file_metadata(project: Project, file_id: str):
     oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
     error = None
     metadata = None
-
+    logger.info(f"Url: {oneprovider_configuration.host}/data/{file_id}")
+    logger.info(f"Token: {oneprovider_configuration.api_key['X-Auth-Token']}")
     try:
         file_op_api = FileOperationsApi(oneprovider_configuration)
         metadata = file_op_api.get_file(EntryRequest(file_id), FA_ALL)

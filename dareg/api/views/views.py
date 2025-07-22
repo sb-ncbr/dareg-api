@@ -15,9 +15,10 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
-
-from .models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
+from .utility import verify_job
+from .models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
 from .serializers import (
+    JobSerializer,
     UserSerializer,
     GroupSerializer,
     FacilitySerializer,
@@ -481,33 +482,43 @@ class WorkflowTemplateViewSet(viewsets.ModelViewSet):
 
     # Override the create method to set the created_by field
     def perform_create(self, serializer):
+        logger.info("Creating a new workflow template viewset")
+        WorkflowTemplate.clean()
         # Check permissions for the workflow template creation
-        if True:
-            logger.info("Creating a new workflow template")
-            # Verify that the workflow with id workflow_id exists in onedata
-            workflow_id = self.request.data.get('id')
-            workflow_existence = verify_workflow_existence(workflow_id)
-            if not workflow_existence:
-                raise PermissionDenied({"detail": "Workflow with the given ID does not exist in Onedata."})
-            
-            """ Verify the workflow has inputsTemplate in schema like:
-            # {
-            #  "inputFile": "store_id",
-            #  "outputFile": "store_id",
-            #  "appConfig": "store_id"
-            # }
-            """
-            # log verifying inputsTemplate
-            print(f"Verifying inputsTemplate for workflow with id {workflow_id} in onedata")
-            inputs_template = self.request.data.get('inputsTemplate')
-            assert inputs_template is not None, "'inputsTemplate' is missing in schema"
-            required_keys = {"inputFile", "outputFile", "appConfig"}
-            assert required_keys.issubset(inputs_template.keys()), \
-                f"'inputsTemplate' must contain keys: {required_keys}"
-            for key in required_keys:
-                assert isinstance(inputs_template[key], str), f"{key} must be a string (store_id)"
-            print(f"InputsTemplate for workflow with id {workflow_id} is valid")
+        serializer.save(created_by=self.request.user)
 
-            serializer.save(created_by=self.request.user)
-        else:
-            raise PermissionDenied({"detail": "You do not have permissions to create a new workflow template."})
+class JobViewSet(viewsets.ModelViewSet):
+    queryset = Job.objects.all()
+    serializer_class = JobSerializer
+    permission_classes = [NestedPerms, IsAuthenticated]
+
+    # Override the create method to set the created_by field and perform validation
+    def perform_create(self, serializer):
+        logger.info("Creating a job viewset")
+        job = serializer.validated_data
+        verify_job(job)
+
+        logger.info(f"Saving job with id {job.id}")
+        # Check permissions for the workflow template creation
+        serializer.save(created_by=self.request.user)
+
+# create a class that represents job input parameters inputFile, outputFile, 
+class JobParams:
+    def __init__(self, inputFile: str, outputFile: str, appConfig: str):
+        if not inputFile or not isinstance(inputFile, str) or not inputFile.strip():
+            raise ValueError("inputFile must be a non-empty string")
+        if not outputFile or not isinstance(outputFile, str) or not outputFile.strip():
+            raise ValueError("outputFile must be a non-empty string")
+        if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
+            raise ValueError("appConfig must be a non-empty string")
+        self.inputFile = inputFile
+        self.outputFile = outputFile
+        self.appConfig = appConfig
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            inputFile=data.get('inputFile'),
+            outputFile=data.get('outputFile'),
+            appConfig=data.get('appConfig')
+        )
