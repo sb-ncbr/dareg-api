@@ -3,7 +3,7 @@ from onedata_api.middleware import create_new_dataset, create_public_share, esta
     create_new_experiment, create_new_temp_token, get_file_metadata, verify_workflow_existence
 
 
-from .models import Job, JobParams, Project
+from .models import Job, JobParams, JobStatus, Project
 import oneprovider_client
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,41 @@ def send_job(job: Job):
     }
 
     logger.info(f"Creating workflow execution with body: {body}")
-    workflow_client.schedule_workflow_execution(body)
-    logger.info("Workflow execution created successfully.")
+    # receipt the respone and get atmWorkflowExecutionId from response schema
+    try:
+        response = workflow_client.schedule_workflow_execution(body)
+        logger.info(f"Workflow execution created successfully.")
+        job.set_status(JobStatus.RUNNING)
+        logger.info(f"Workflow execution ID: {response}")
+        job.workflow_execution_id = response.atm_workflow_execution_id
+        job.save() 
+    except Exception as e:
+        logger.error(f"Failed to create workflow execution: {e}")
+        raise
 
+def get_job_status(job: Job):
+    logger.info(f"Getting status for job with id {job.workflow_execution_id}")
+    import requests
+    project = job.workflow_temaplate_id.project_id
+    provider_url = project.facility.onedata_provider_url.rstrip('/')
+    token = project.facility.onedata_token
+    execution_id = job.workflow_execution_id
+    url = f"{provider_url}/api/v3/oneprovider/automation/execution/workflows/{execution_id}"
+    headers = {"X-Auth-Token": token}
 
+    logger.info(f"Polling workflow execution for job: {job.id}, execution ID: {execution_id} via direct HTTP request")
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        logger.info("Workflow received successfully.")
+        data = response.json()
+        status = data.get("status")
+        if status == "finished":
+            logger.info(f"Job {job.id} finished successfully.")
+            job.set_status(JobStatus.SUCCESS)
+        elif status != "active":
+            logger.info(f"Job {job.id} finished with failure.")
+            job.set_status(JobStatus.FAILURE)
+    except Exception as e:
+        logger.error(f"Failed to poll workflow execution: {e}")
+        # TODO: handle properly

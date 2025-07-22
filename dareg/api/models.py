@@ -449,12 +449,11 @@ class WorkflowTemplate(PermsObject):
 
 class JobStatus(StrEnum):
     NEW = "new"
-    PREPARED = "prepared"
     RUNNING = "running"
-    SYNCHRONIZING = "synchronizing"
+    # TODO: Implement scheduling state
+    SCHEDULING = "scheduling"
     SUCCESS = "success"
     FAILURE = "failure"
-    DISCARDED = "discarded"
 
     @classmethod
     def choices(cls):
@@ -485,6 +484,7 @@ class Job(PermsObject):
         null=True,
         blank=True,
     )
+    workflow_execution_id = models.CharField("Workflow Execution ID", max_length=200, blank=True, null=True, editable=False)
     content_object = GenericForeignKey('content_type', 'object_id')
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500, blank=True)
@@ -507,6 +507,29 @@ class Job(PermsObject):
 
         # Check permissions for the workflow template creation
     
+    def set_status(self, new_status):
+        """
+        Change the status of the job to a new valid state.
+        Args:
+            new_status (str): The new status to set. Must be a valid JobStatus value.
+            save (bool): Whether to save the model after changing status. Default True.
+        Raises:
+            ValueError: If new_status is not a valid JobStatus value.
+        """
+        valid_statuses = {status.value for status in JobStatus}
+        if new_status not in valid_statuses:
+            raise ValueError(f"Invalid job status: {new_status}. Must be one of: {valid_statuses}")
+        
+        if self.status == JobStatus.NEW and new_status == JobStatus.RUNNING:
+            self.status = new_status
+        elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
+            self.status = new_status
+        else:
+            raise ValueError(f"Cannot change job status from {self.status} to {new_status}. Invalid transition.")
+        
+        self.save(update_fields=["status"])
+
+
 # create a class that represents job input parameters inputFile, outputFile, 
 class JobParams:
     def __init__(self, inputFile: str, outputFile: str, appConfig: str):

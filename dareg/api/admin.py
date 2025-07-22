@@ -312,7 +312,6 @@ class JobAdmin(BaseModelAdmin):
         if not change:
             obj.created_by = request.user
         obj.modified_by = request.user
-        send_job(obj)
         obj.save()
 
 
