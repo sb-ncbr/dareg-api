@@ -30,7 +30,7 @@ from knox.settings import CONSTANTS, knox_settings
 from knox.models import AuthToken
 from knox.models import AuthTokenManager
 from django.utils import timezone
-from .utility import send_job, verify_job
+from .utility import send_job, verify_job, verify_workflow_existence, verify_workflow_template
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
 logger = logging.getLogger(__name__)
@@ -300,6 +300,17 @@ class UserAdmin(BaseUserAdmin):
 class WorkflowTemplateAdmin(BaseModelAdmin):
     list_display = ('name',) + BaseModelAdmin.list_display
     search_fields = ('name', 'status')
+
+    def save_model(self, request, obj, form, change):
+        logger.info("Verifying job in admin save_model")
+        verify_workflow_template(obj)
+        verify_workflow_existence(obj)
+        # verify_workflow_stores(obj)
+        logger.info(f"Saving workflow with id {obj.id if obj.id else 'new'}")
+        if not change:
+            obj.created_by = request.user
+        obj.modified_by = request.user
+        obj.save()
 
 class JobAdmin(BaseModelAdmin):
     list_display = ('name',) + BaseModelAdmin.list_display

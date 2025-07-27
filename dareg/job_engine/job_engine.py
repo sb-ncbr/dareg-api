@@ -37,7 +37,7 @@ class JobEngine:
         from api.utility import get_job_status
         self.logger.info("Fetching job statuses")
         max_jobs = getattr(settings, "JOB_ENGINE_POLL_LIMIT", JOB_ENGINE_POLL_LIMIT)
-        jobs = Job.objects.all().order_by('created')[:max_jobs]
+        jobs = Job.objects.all().filter(status=JobStatus.NEW).order_by('created')[:max_jobs]
         for job in jobs:
             status = job.status
             get_job_status(job)

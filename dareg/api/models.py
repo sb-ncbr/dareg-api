@@ -423,29 +423,20 @@ class WorkflowTemplate(PermsObject):
         verbose_name_plural = "workflowtemplates"
     
     def clean(self):
-        if True:
-            logger.info("Creating a new workflow template")
-            # Verify that the workflow with id workflow_id exists in onedata
-            workflow_id = self.id
-            
-            """ Verify the workflow has inputsTemplate in schema like:
-            # {
-            #  "inputFile": "store_id",
-            #  "outputFile": "store_id",
-            #  "appConfig": "store_id"
-            # }
-            """
-            # log verifying inputsTemplate
-            logger.info(f"Verifying inputsTemplate for workflow with id {workflow_id} in onedata")
-            assert self.input_params is not None, "'inputsTemplate' is missing in schema"
-            required_keys = {"inputFile", "outputFile", "appConfig"}
-            assert required_keys.issubset(self.input_params.keys()), \
-                f"'inputsTemplate' must contain keys: {required_keys}"
-            for key in required_keys:
-                assert isinstance(self.input_params[key], str), f"{key} must be a string (store_id)"
-            logger.info(f"InputsTemplate for workflow with id {workflow_id} is valid")
-        else:
-            raise PermissionDenied({"detail": "You do not have permissions to create a new workflow template."})
+        
+        logger.info("Creating a new workflow template")
+        # Verify that the workflow with id workflow_id exists in onedata
+        workflow_id = self.id
+        
+        """ Verify the workflow has inputsTemplate in schema like:
+        # {
+        #  "inputFile": "store_id",
+        #  "outputFile": "store_id",
+        #  "appConfig": "JSON config"
+        # }
+        """
+        # log verifying inputsTemplate
+        # verify_workflow_template(self)
 
 class JobStatus(StrEnum):
     NEW = "new"
@@ -520,6 +511,9 @@ class Job(PermsObject):
         if new_status not in valid_statuses:
             raise ValueError(f"Invalid job status: {new_status}. Must be one of: {valid_statuses}")
         
+        if self.status == new_status:
+            logger.info(f"Job {self.id} status is already {new_status}. No change needed.")
+            return
         if self.status == JobStatus.NEW and new_status == JobStatus.RUNNING:
             self.status = new_status
         elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
