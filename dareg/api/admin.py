@@ -18,7 +18,7 @@ from .models import (
     UserProfile, Instrument, Experiment,
     WorkflowTemplate
 )
-from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset
+from onedata_api.middleware import verify_job, verify_workflow_existence, verify_workflow_template, create_new_dataset, create_public_share, establish_dataset
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.http import HttpRequest
@@ -30,7 +30,6 @@ from knox.settings import CONSTANTS, knox_settings
 from knox.models import AuthToken
 from knox.models import AuthTokenManager
 from django.utils import timezone
-from .utility import send_job, verify_job, verify_workflow_existence, verify_workflow_template
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
 logger = logging.getLogger(__name__)
@@ -302,7 +301,7 @@ class WorkflowTemplateAdmin(BaseModelAdmin):
     search_fields = ('name', 'status')
 
     def save_model(self, request, obj, form, change):
-        logger.info("Verifying job in admin save_model")
+        logger.info("Verifying job in admin save_model") 
         verify_workflow_template(obj)
         verify_workflow_existence(obj)
         # verify_workflow_stores(obj)
@@ -318,6 +317,7 @@ class JobAdmin(BaseModelAdmin):
 
     def save_model(self, request, obj, form, change):
         logger.info("Verifying job in admin save_model")
+        self.full_clean() 
         verify_job(obj)
         logger.info(f"Saving job with id {obj.id if obj.id else 'new'}")
         if not change:

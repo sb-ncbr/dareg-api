@@ -15,7 +15,6 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
-from .utility import verify_job
 from .models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
 from .serializers import (
     JobSerializer,
@@ -41,7 +40,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
-    create_new_experiment, create_new_temp_token, get_file_metadata, verify_workflow_existence
+    create_new_experiment, create_new_temp_token, get_file_metadata, verify_job
 
 logger = logging.getLogger(__name__)
 
@@ -475,18 +474,6 @@ class TempTokenAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class WorkflowTemplateViewSet(viewsets.ModelViewSet):
-    queryset = WorkflowTemplate.objects.all()
-    serializer_class = WorkflowTemplateSerializer
-    permission_classes = [NestedPerms, IsAuthenticated]
-
-    # Override the create method to set the created_by field
-    def perform_create(self, serializer):
-        logger.info("Creating a new workflow template viewset")
-        WorkflowTemplate.clean()
-        # Check permissions for the workflow template creation
-        serializer.save(created_by=self.request.user)
-
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
@@ -495,12 +482,13 @@ class JobViewSet(viewsets.ModelViewSet):
     # Override the create method to set the created_by field and perform validation
     def perform_create(self, serializer):
         logger.info("Creating a job viewset")
+        self.full_clean()  # Ensure the job is valid before saving
         job = serializer.validated_data
         verify_job(job)
 
         logger.info(f"Saving job with id {job.id}")
         # Check permissions for the workflow template creation
-        serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
 
 # create a class that represents job input parameters inputFile, outputFile, 
 class JobParams:

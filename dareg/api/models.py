@@ -495,8 +495,6 @@ class Job(PermsObject):
             raise ValidationError({
                 "content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
             })
-
-        # Check permissions for the workflow template creation
     
     def set_status(self, new_status):
         """
