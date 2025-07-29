@@ -312,19 +312,25 @@ class WorkflowTemplateAdmin(BaseModelAdmin):
         obj.save()
 
 class JobAdmin(BaseModelAdmin):
-    list_display = ('name',) + BaseModelAdmin.list_display
+    from rest_framework.exceptions import MethodNotAllowed
+    list_display = ('name', 'status') + BaseModelAdmin.list_display
     search_fields = ('name', 'status')
 
     def save_model(self, request, obj, form, change):
+        if change:
+            from django.core.exceptions import PermissionDenied
+            raise self.MethodNotAllowed("Job instances are not updateable.")
         logger.info("Verifying job in admin save_model")
-        self.full_clean() 
         verify_job(obj)
         logger.info(f"Saving job with id {obj.id if obj.id else 'new'}")
-        if not change:
-            obj.created_by = request.user
+        
+        obj.created_by = request.user
         obj.modified_by = request.user
         obj.save()
 
+    def delete_model(self, request, obj):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Job instances cannot be deleted.")
 
 def _change_group_display_name(group: Group) -> str:
     try:

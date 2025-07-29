@@ -264,16 +264,16 @@ def verify_job(job: Job):
 
     logger.info(f"Verifying input file {input_file} existence - needs to be folder.")
 
-    project_id = job.workflow_temaplate_id.project_id.id
-    logger.info(f"Project ID: {project_id}")
-    metadata, error = get_file_metadata(project_id, input_file)
+    project = job.workflow_temaplate_id.project_id
+    logger.info(f"Project: {project}")
+    metadata, error = get_file_metadata(project, input_file)
     if error:
         raise ValueError(f"Input file validation failed: {error}")
     else:
         logger.info(f"Input file metadata: {metadata}")        
 
     logger.info(f"Verifying output file existence - needs to be folder: {output_file}")
-    metadata, error = get_file_metadata(project_id, output_file)
+    metadata, error = get_file_metadata(project, output_file)
     if error:
         raise ValueError(f"Output file validation failed: {error}")
     else:
@@ -287,19 +287,17 @@ def send_job(job: Job):
     oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
     workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
 
-    workflow_input_params_dict = json.loads(job.workflow_temaplate_id.input_params)
-    job_input_params_dict = json.loads(job.input_params)
     body = {
         "spaceId": f"{job.workflow_temaplate_id.project_id.onedata_space_id}",
         "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.workflow_id}",
         "atmWorkflowSchemaRevisionNumber": 1,
         "storeInitialContentOverlay": {
-            f"{workflow_input_params_dict['inputFile']}": [
+            f"{job.workflow_temaplate_id.input_params['inputFile']}": [
                 {
-                    "fileId": f"{job_input_params_dict['inputFile']}",
+                    "fileId": f"{job.input_params['inputFile']}",
                 }
             ],
-            f"{workflow_input_params_dict['outputFile']}": [f"{job_input_params_dict['outputFile']}"]
+            f"{job.workflow_temaplate_id.input_params['outputFile']}": [f"{job.input_params['outputFile']}"]
         },
         "logLevel": "debug",
         "callback": "https://my-server.example.com/execution-callback"

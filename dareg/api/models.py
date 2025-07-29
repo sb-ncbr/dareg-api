@@ -421,22 +421,6 @@ class WorkflowTemplate(PermsObject):
     class Meta:
         verbose_name = "workflowtemplate"
         verbose_name_plural = "workflowtemplates"
-    
-    def clean(self):
-        
-        logger.info("Creating a new workflow template")
-        # Verify that the workflow with id workflow_id exists in onedata
-        workflow_id = self.id
-        
-        """ Verify the workflow has inputsTemplate in schema like:
-        # {
-        #  "inputFile": "store_id",
-        #  "outputFile": "store_id",
-        #  "appConfig": "JSON config"
-        # }
-        """
-        # log verifying inputsTemplate
-        # verify_workflow_template(self)
 
 class JobStatus(StrEnum):
     NEW = "new"

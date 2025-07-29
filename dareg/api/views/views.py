@@ -474,7 +474,28 @@ class TempTokenAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class WorkflowTemplateViewSet(viewsets.ModelViewSet):
+    queryset = WorkflowTemplate.objects.all()
+    serializer_class = WorkflowTemplateSerializer
+    permission_classes = [NestedPerms, IsAuthenticated]
+
+    # Override the create method to set the created_by field
+    def perform_create(self, serializer):
+        logger.info("Creating a new workflow template viewset")
+        WorkflowTemplate.clean()
+        # Check permissions for the workflow template creation
+        serializer.save(created_by=self.request.user)
+
+
 class JobViewSet(viewsets.ModelViewSet):
+    from rest_framework.exceptions import MethodNotAllowed
+
+    def update(self, request, *args, **kwargs):
+        raise self.MethodNotAllowed('PUT', detail="Job instances are not updateable.")
+
+    def partial_update(self, request, *args, **kwargs):
+        raise self.MethodNotAllowed('PATCH', detail="Job instances are not updateable.")
+    
     queryset = Job.objects.all()
     serializer_class = JobSerializer
     permission_classes = [NestedPerms, IsAuthenticated]
@@ -482,7 +503,6 @@ class JobViewSet(viewsets.ModelViewSet):
     # Override the create method to set the created_by field and perform validation
     def perform_create(self, serializer):
         logger.info("Creating a job viewset")
-        self.full_clean()  # Ensure the job is valid before saving
         job = serializer.validated_data
         verify_job(job)
 
