@@ -290,14 +290,14 @@ def send_job(job: Job):
     body = {
         "spaceId": f"{job.workflow_temaplate_id.project_id.onedata_space_id}",
         "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.workflow_id}",
-        "atmWorkflowSchemaRevisionNumber": 1,
+        "atmWorkflowSchemaRevisionNumber": 3,
         "storeInitialContentOverlay": {
-            f"{job.workflow_temaplate_id.input_params['inputFile']}": [
-                {
-                    "fileId": f"{job.input_params['inputFile']}",
-                }
-            ],
-            f"{job.workflow_temaplate_id.input_params['outputFile']}": [f"{job.input_params['outputFile']}"]
+            f"{job.workflow_temaplate_id.input_params['inputFile']}": {
+                "fileId": f"{job.input_params['inputFile']}"
+            },
+            f"{job.workflow_temaplate_id.input_params['outputFile']}": {
+                "fileId": f"{job.input_params['outputFile']}"
+            }
         },
         "logLevel": "debug",
         "callback": "https://my-server.example.com/execution-callback"
