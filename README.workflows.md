@@ -96,9 +96,9 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
 
 ### Openfaas instalation (source https://onedata.org/training/automation.html#5 slide 5-9)
 1. Let's access bastion/worker via SSH from your local host
-2. From the session information in https://ondemand-dev.metacentrum.cz/pun/sys/dashboard generate a kubeconfig(the info is in your session)
-3. Check that kubectl works for you and you see nodes and DNS pods(some adjustment needs to be done here, gpt will help)
-4. Change to working directory
+2. From the session information in https://ondemand-dev.metacentrum.cz/pun/sys/dashboard generate a kubeconfig(the info is in your session) in your bastion/worker
+3. Check that kubectl works for you and you see nodes and DNS pods(some adjustment needs to be done here, gpt will help - Change config map of dns core to 8.8.8.8 or 1.1.1.1, restart deployment)
+4. Change to some chosen working directory
 5. Run git clone https://github.com/onedata/onedata-deployments.git
 6. Change file openfaas/ansible/roles/common/tasks/main.yml to content -> so get rid of the docker install, kubernetes install and cluster setup. Setup just roles to existing cluster
     - ``` - name: A become=yes block
@@ -155,14 +155,7 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
 
             - name: Print Helm version
             debug:
-                msg: "Helm version: {{ helm_output.stdout }}"```
-    - TODO: USE PROPER USER - debian
-7. Run 
-    - ```cd onedata-deployments/openfaas/ansible/
-        sudo apt install -y python3 python3-pip
-        sudo python3 -m pip install ansible "Jinja2>=2.10,<3.1" jmespath kubernetes
-        ```
-    - or setup the prerequisities according this readme https://github.com/onedata/onedata-deployments/blob/master/openfaas/ansible/README.md    
+                msg: "Helm version: {{ helm_output.stdout }}"```   
 8. Edit ./group_vars/all.yaml with proper values. This section is just illustrative, add your own values
     - ```
         # Oneprovider hostname - should be accessible from the OpenFaaS host.
@@ -203,6 +196,62 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
         # (ansible will adjust its configuration and restart it).
         oneprovider-vm ansible_host=147.251.255.78 ansible_user=<your-user-used-in-oneprovider-for-ssh, i.e. debian> # e.g. public IP of the one provider
       ```
-10. TODO: Add ssh keys
-11. TODO: Run
-12. TODO: torubleshoot
+10. Improve ./roles/provider-config/tasks/main.yml file to generate a config file for oneprovider in oneprovider machine
+    - ```- name: Obtain openfaas password
+            shell: |
+                kubectl -n "{{openfaas_namespace}}" get secret openfaas-basic-auth -o jsonpath="{.data.basic-auth-password}" | base64 --decode
+            register: kube_output
+
+            - name: Place password in var
+            set_fact:
+                openfaas_admin_password: "{{kube_output.stdout}}"
+
+            - name: Generate op-openfaas.config
+            template:
+                src: openfaas-config.j2
+                dest: /home/debian/oneprovider_config/99-openfaas.config # this is destination file where oneprovider config will be produced; we will use that later```
+11. Add SSH key of your machine where ansible is located(worker, bastion) to one provider so the ansible can perform step 10. make sure oneprovider is reachable at port 22.
+12. Run 
+    - ```cd onedata-deployments/openfaas/ansible/
+        sudo apt install -y python3 python3-pip
+        sudo python3 -m pip install ansible "Jinja2>=2.10,<3.1" jmespath kubernetes
+        ```
+    - or setup the prerequisities according this readme https://github.com/onedata/onedata-deployments/blob/master/openfaas/ansible/README.md 
+13. Make sure all nodes can be connected via SSH
+    - from bastion/worker to CP
+    - from bastion/worker to oneprovider
+    - from CP to oneprovider
+14. Finally, run the ansible playbook via command ```ansible-playbook -i hosts site.yml```
+15. Hopefully, everything goes well. Now check whether there is a config on oneprovider machine at path you specified in step 10. In case of the README, it's ```/home/debian/oneprovider_config/99-openfaas.config```. Make sure the file exists and move it to the appropriate folder, where oneprovider reads its configs. In case of our dev provider ```oneprovider01-devel-onedata-e-infra-cz``` the path for reading the config by oneprovider is ```/opt/onedata/oneprovider/persistence/etc/op_worker/config.d/```, so move the config there. The config looks like this(delete the comments):
+    -```[
+        {op_worker, [
+            {openfaas_host, "78.128.235.174"}, # IP of your worker node
+            {openfaas_port, 31112},
+            {openfaas_function_namespace, "openfaas-fn"},
+            {openfaas_admin_username, "admin"},
+            {openfaas_admin_password, "your-password"}, # password you specified in step 8. under field 'openfaas_admin_password'
+            {openfaas_function_constraints, []},
+            {openfaas_function_labels, #{}},
+            {openfaas_function_limits, #{}},
+            {openfaas_function_annotations, #{}},
+            {openfaas_function_requests, #{}},
+            {openfaas_function_env, #{
+                "read_timeout" => "604800s",
+                "write_timeout" => "604800s",
+                "exec_timeout" => "604800s"}
+            },
+            {openfaas_activity_feed_secret, "your-secret"} # secret you specified in step 8. under field 'openfaas_activity_feed_secret'
+        ]}
+    ]```
+16. Restart one provider to reload the config.
+17. If everything goes well, your oneprovider should enable button run workflow on a file as depicted in the picture.
+    - <img src="workflowButton.png" alt="alt text" width="1200" height="400"/>
+18. You should see openfaas namespaces deployed to kubernetes cluster with some running pods.
+
+### Run your first workflow
+1. Create a simple workflow that adds file hash into file metadata in one data as described
+2. Run the workflow on a file
+3. There should be problems running the openfaas worker pod(the pod that actually does the job). In that case:
+    - TODO: edit secret Mutatingwebhookconfigurations by deleting last 4 characters - 'Cg=='
+    - TODO: configure /etc/hosts
+4. Now your workflow should run properly
