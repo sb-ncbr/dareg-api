@@ -5,7 +5,7 @@ from rest_framework import routers
 from api.views import views
 from api.views.query import GeneralSearchViewSet
 from api.views.schemas import SchemaMetadataFieldsView
-from api.views import WorkflowTemplateViewSet
+# WorkflowTemplateViewSet is imported via views
 from onedata_api.urls import urlpatterns as onedata_router
 from datacite_api.urls import urlpatterns as datacite_router
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -23,7 +23,7 @@ router.register(r"instrument", views.InstrumentViewSet, basename='instrument')
 router.register(r"experiments", views.ExperimentViewSet, basename='experiment')
 router.register(r'query', GeneralSearchViewSet, basename='query')
 router.register(r"experiments", views.ExperimentViewSet, basename= 'experiment')
-router.register(r"workflow", WorkflowTemplateViewSet, basename='workflow')
+router.register(r"workflow", views.WorkflowTemplateViewSet, basename='workflow')
 
 urlpatterns = [
     path("api/v1/", include(router.urls)),

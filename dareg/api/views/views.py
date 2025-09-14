@@ -15,8 +15,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
-from .models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
-from .serializers import (
+from api.models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
+from api.serializers import (
     JobSerializer,
     UserSerializer,
     GroupSerializer,

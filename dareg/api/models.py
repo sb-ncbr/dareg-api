@@ -411,8 +411,7 @@ class UserProfile(BaseModel):
         return f'{self.full_name}'
     
 class WorkflowTemplate(PermsObject):
-    # TODO: make workflow project m:n
-    project_id = models.ForeignKey(Project, models.PROTECT)
+    projects = models.ManyToManyField(Project)
     workflow_id = models.CharField("Workflow ID", max_length=200, unique=True)
     name = models.CharField("Name", max_length=200, blank=True)
     description = models.CharField("Description", max_length=500, blank=True)

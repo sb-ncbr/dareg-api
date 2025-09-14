@@ -259,6 +259,6 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
     - TODO: configure /etc/hosts
 6. Now all your workflows should run properly
 
-## Run your workflow utilizing OneData
+## TODO: Run your workflow utilizing OneData
 
 
