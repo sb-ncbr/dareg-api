@@ -255,3 +255,5 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
     - TODO: edit secret Mutatingwebhookconfigurations by deleting last 4 characters - 'Cg=='
     - TODO: configure /etc/hosts
 4. Now your workflow should run properly
+
+

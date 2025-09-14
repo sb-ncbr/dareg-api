@@ -411,6 +411,7 @@ class UserProfile(BaseModel):
         return f'{self.full_name}'
     
 class WorkflowTemplate(PermsObject):
+    # TODO: make workflow project m:n
     project_id = models.ForeignKey(Project, models.PROTECT)
     workflow_id = models.CharField("Workflow ID", max_length=200, unique=True)
     name = models.CharField("Name", max_length=200, blank=True)
@@ -425,7 +426,7 @@ class WorkflowTemplate(PermsObject):
 class JobStatus(StrEnum):
     NEW = "new"
     RUNNING = "running"
-    # TODO: Implement scheduling state
+    # TODO: Implement scheduling state?
     SCHEDULING = "scheduling"
     SUCCESS = "success"
     FAILURE = "failure"
@@ -447,6 +448,7 @@ class Job(PermsObject):
     workflow_temaplate_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
     workflow_id = models.CharField("Workflow ID", max_length=200)
     # Generic relation to Project, Dataset, or Experiment
+    # TODO: rename me
     content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
@@ -454,6 +456,7 @@ class Job(PermsObject):
         null=True,
         blank=True,
     )
+    # TODO: rename me
     object_id = models.UUIDField(
         help_text="ID of the related object (Project, Dataset, or Experiment)",
         null=True,
