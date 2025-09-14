@@ -248,12 +248,17 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
     - <img src="workflowButton.png" alt="alt text" width="1200" height="400"/>
 18. You should see openfaas namespaces deployed to kubernetes cluster with some running pods.
 
-### Run your first workflow
-1. Create a simple workflow that adds file hash into file metadata in one data as described
-2. Run the workflow on a file
-3. There should be problems running the openfaas worker pod(the pod that actually does the job). In that case:
+### Run your first workflow manually via onedata UI
+1. Configure the workflow as described here [Workflow Demo README](./workflow-demo-hashes-of-the-files/README.md).
+2. Upload the workflow json in the workflow UI menu - upload json file
+3. Right click on a file/folder and press 'Run Workflow' button.
+4. COnfgure and run.
+5. There should may be problems running the openfaas worker pod for the first time(the pod that actually does the job). In that case:
+    - open by k9s your kubernetes 
     - TODO: edit secret Mutatingwebhookconfigurations by deleting last 4 characters - 'Cg=='
     - TODO: configure /etc/hosts
-4. Now your workflow should run properly
+6. Now all your workflows should run properly
+
+## Run your workflow utilizing OneData
 
 
