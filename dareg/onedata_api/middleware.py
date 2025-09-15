@@ -289,7 +289,7 @@ def send_job(job: Job):
 
     body = {
         "spaceId": f"{job.workflow_temaplate_id.project_id.onedata_space_id}",
-        "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.workflow_id}",
+        "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.onedata_workflow_id}",
         "atmWorkflowSchemaRevisionNumber": 3,
         "storeInitialContentOverlay": {
             f"{job.workflow_temaplate_id.input_params['inputFile']}": {
@@ -311,7 +311,7 @@ def send_job(job: Job):
         logger.info(f"Workflow execution created successfully.")
         job.set_status(JobStatus.RUNNING)
         logger.info(f"Workflow execution ID: {response}")
-        job.workflow_execution_id = response.atm_workflow_execution_id
+        job.onedata_workflow_execution_id = response.atm_workflow_execution_id
         job.save() 
     except Exception as e:
         logger.error(f"Failed to create workflow execution: {e}")
@@ -327,9 +327,9 @@ def get_job_status(job: Job):
     # oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
     # workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
 
-    logger.info(f"Polling workflow execution for job: {job.id}, execution ID: {job.workflow_execution_id}")
+    logger.info(f"Polling workflow execution for job: {job.id}, execution ID: {job.onedata_workflow_execution_id}")
     # TODO: Use workflow_client.get_workflow_execution_details instead
-    status = fetch_workflow_status_via_http(project, job.workflow_execution_id)
+    status = fetch_workflow_status_via_http(project, job.onedata_workflow_execution_id)
     if status:
         logger.info("Workflow received successfully.")
         if status == "finished":
@@ -345,10 +345,10 @@ def get_job_status(job: Job):
         # TODO: handle properly - try several times, if not available, set to failure
 
 # TODO: Drop this function once library fix is introduced
-def fetch_workflow_status_via_http(project, workflow_execution_id):
+def fetch_workflow_status_via_http(project, onedata_workflow_execution_id):
     provider_url = project.facility.onedata_provider_url
     token = project.facility.onedata_token
-    url = f"{provider_url}/automation/execution/workflows/{workflow_execution_id}"
+    url = f"{provider_url}/automation/execution/workflows/{onedata_workflow_execution_id}"
     headers = {
         "X-Auth-Token": token,
         "Accept": "application/json"
@@ -366,7 +366,7 @@ def verify_workflow_existence(workflow: WorkflowTemplate):
     """
     Verify that the workflow with the given ID exists in the Oneprovider.
     """
-    logger.info(f"Verifying workflow with id {workflow.workflow_id} exists in onedata")
+    logger.info(f"Verifying workflow with id {workflow.onedata_workflow_id} exists in onedata")
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = workflow.project_id.facility.onedata_provider_url
     oneprovider_configuration.api_key['X-Auth-Token'] = workflow.project_id.facility.onedata_token
@@ -374,20 +374,20 @@ def verify_workflow_existence(workflow: WorkflowTemplate):
     
     try:
         # TODO: Verify that the workflow with this ID exists
-        logger.info(f"Workflow with id {workflow.workflow_id} exists.")
+        logger.info(f"Workflow with id {workflow.onedata_workflow_id} exists.")
         return True
     except Exception as e:
-        logger.error(f"Workflow with id {workflow.workflow_id} does not exist: {e}")
+        logger.error(f"Workflow with id {workflow.onedata_workflow_id} does not exist: {e}")
         return False
     
 def verify_workflow_template(workflow: WorkflowTemplate):
-    logger.info(f"Verifying inputsTemplate for workflow with id {workflow.workflow_id} in onedata")
+    logger.info(f"Verifying inputsTemplate for workflow with id {workflow.onedata_workflow_id} in onedata")
     assert workflow.input_params is not None, "'inputsTemplate' is missing in schema"
     required_keys = {"inputFile", "outputFile", "appConfig"}
     assert required_keys.issubset(workflow.input_params.keys()), \
         f"'inputsTemplate' must contain keys: {required_keys}"
     for key in required_keys:
         assert isinstance(workflow.input_params[key], str), f"{key} must be a string (store_id)"
-    logger.info(f"InputsTemplate for workflow with id {workflow.workflow_id} is valid")
+    logger.info(f"InputsTemplate for workflow with id {workflow.onedata_workflow_id} is valid")
 
     # TODO: Verify that workflow stores exist

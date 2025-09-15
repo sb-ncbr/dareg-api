@@ -251,19 +251,19 @@ class JobSerializer(serializers.ModelSerializer):
 
         # Enforce required fields
         required_fields = [
-            "workflow_template", "content_type", "object_id", "name", "description", "input_params", "log_level"
+            "workflow_template", "root_resource_content_type", "root_resource_id", "name", "description", "input_params", "log_level"
         ]
         missing_fields = [field for field in required_fields if not attrs.get(field)]
         if missing_fields:
             raise ValidationError({field: "This field is required." for field in missing_fields})
 
-        # Enforce that content_type is only Experiment, Dataset, or Project
+        # Enforce that root_resource_content_type is only Experiment, Dataset, or Project
         allowed_models = {"experiment", "dataset", "project"}
-        content_type = attrs.get("content_type")
-        model_name = content_type.model if content_type else None
+        root_resource_content_type = attrs.get("root_resource_content_type")
+        model_name = root_resource_content_type.model if root_resource_content_type else None
         if model_name and model_name not in allowed_models:
             raise ValidationError({
-                "content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
+                "root_resource_content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
             })
 
         return attrs

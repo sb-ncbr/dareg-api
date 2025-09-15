@@ -409,14 +409,25 @@ class UserProfile(BaseModel):
 
     def __str__(self):
         return f'{self.full_name}'
-    
+
+class WorkflowType(StrEnum):
+    WRITE_DATA = "WriteData"
+    READONLY = "Readonly"
+    IN_PLACE_CHANGE = "In-placeChange"
+    EXPORT = "Export"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
 class WorkflowTemplate(PermsObject):
     projects = models.ManyToManyField(Project)
-    workflow_id = models.CharField("Workflow ID", max_length=200, unique=True)
+    onedata_workflow_id = models.CharField("Onedata Workflow ID", max_length=200, unique=True)
     name = models.CharField("Name", max_length=200, blank=True)
     description = models.CharField("Description", max_length=500, blank=True)
     revision = models.DecimalField("Revision", max_digits=10, decimal_places=0, default=1)
     input_params = models.JSONField("JSON", default=dict, blank=True)
+    workflow_type = models.CharField("Workflow Type", max_length=20, choices=WorkflowType.choices(), default=WorkflowType.READONLY)
 
     class Meta:
         verbose_name = "workflowtemplate"
@@ -442,27 +453,25 @@ class JobLogLevel(StrEnum):
     @classmethod
     def choices(cls):
         return [(key.value, key.name) for key in cls]
-    
+
 class Job(PermsObject):
     workflow_temaplate_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
-    workflow_id = models.CharField("Workflow ID", max_length=200)
+    onedata_workflow_id = models.CharField("Onedata Workflow ID", max_length=200)
     # Generic relation to Project, Dataset, or Experiment
-    # TODO: rename me
-    content_type = models.ForeignKey(
+    root_resource_content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
         help_text="Content type of the related object (Project, Dataset, or Experiment)",
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
-    # TODO: rename me
-    object_id = models.UUIDField(
+    root_resource_id = models.UUIDField(
         help_text="ID of the related object (Project, Dataset, or Experiment)",
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
-    workflow_execution_id = models.CharField("Workflow Execution ID", max_length=200, blank=True, null=True, editable=False)
-    content_object = GenericForeignKey('content_type', 'object_id')
+    root_resource_object = GenericForeignKey('root_resource_content_type', 'root_resource_id')
+    onedata_workflow_execution_id = models.CharField("Onedata Workflow Execution ID", max_length=200, blank=True, null=True, editable=False)
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500, blank=True)
     status = models.CharField(choices=JobStatus.choices(), default=JobStatus.NEW, max_length=20, editable=False)
@@ -473,13 +482,13 @@ class Job(PermsObject):
 
 
     def clean(self):
-        # Enforce that content_type is only Experiment, Dataset, or Project
+        # Enforce that root_resource_content_type is only Experiment, Dataset, or Project
         allowed_models = {"experiment", "dataset", "project"}
-        model_name = self.content_type.model
+        model_name = self.root_resource_content_type.model
         if model_name not in allowed_models:
             from django.core.exceptions import ValidationError
             raise ValidationError({
-                "content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
+                "root_resource_content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
             })
     
     def set_status(self, new_status):
@@ -506,9 +515,7 @@ class Job(PermsObject):
             raise ValueError(f"Cannot change job status from {self.status} to {new_status}. Invalid transition.")
         
         self.save(update_fields=["status"])
-
-
-# create a class that represents job input parameters inputFile, outputFile, 
+ 
 class JobParams:
     def __init__(self, inputFile: str, outputFile: str, appConfig: str):
         if not inputFile or not isinstance(inputFile, str) or not inputFile.strip():
