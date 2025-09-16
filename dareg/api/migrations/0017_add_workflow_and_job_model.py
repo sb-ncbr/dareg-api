@@ -6,10 +6,6 @@ from django.db import migrations, models
 import django.db.models.deletion
 import django_extensions.db.fields
 import uuid
-import logging
-
-
-logger = logging.getLogger(__name__)
 
 
 class Migration(migrations.Migration):

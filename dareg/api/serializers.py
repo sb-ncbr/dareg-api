@@ -245,28 +245,6 @@ class WorkflowTemplateSerializer(serializers.ModelSerializer):
         return WorkflowTemplate.objects.create(**validated_data)
     
 class JobSerializer(serializers.ModelSerializer):
-    def validate(self, attrs):
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        from rest_framework.serializers import ValidationError
-
-        # Enforce required fields
-        required_fields = [
-            "workflow_template", "root_resource_content_type", "root_resource_id", "name", "description", "input_params", "log_level"
-        ]
-        missing_fields = [field for field in required_fields if not attrs.get(field)]
-        if missing_fields:
-            raise ValidationError({field: "This field is required." for field in missing_fields})
-
-        # Enforce that root_resource_content_type is only Experiment, Dataset, or Project
-        allowed_models = {"experiment", "dataset", "project"}
-        root_resource_content_type = attrs.get("root_resource_content_type")
-        model_name = root_resource_content_type.model if root_resource_content_type else None
-        if model_name and model_name not in allowed_models:
-            raise ValidationError({
-                "root_resource_content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
-            })
-
-        return attrs
     class Meta:
         model = Job
         fields = "__all__"

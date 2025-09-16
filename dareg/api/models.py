@@ -250,9 +250,10 @@ class Project(PermsObject):
         related_name="default_dataset_schema",
     )
     onedata_space_id = models.CharField("Onedata space ID", max_length=200, blank=True)
+    workflow_templates = models.ManyToManyField('WorkflowTemplate', blank=True, related_name='supported_projects')
 
     trigram_search_fields = ["name", "description"]
-    
+
     class Meta:
         unique_together = ("facility", "name")
 
@@ -421,7 +422,6 @@ class WorkflowType(StrEnum):
         return [(key.value, key.name) for key in cls]
 
 class WorkflowTemplate(PermsObject):
-    projects = models.ManyToManyField(Project)
     onedata_workflow_id = models.CharField("Onedata Workflow ID", max_length=200, unique=True)
     name = models.CharField("Name", max_length=200, blank=True)
     description = models.CharField("Description", max_length=500, blank=True)
@@ -456,19 +456,18 @@ class JobLogLevel(StrEnum):
 
 class Job(PermsObject):
     workflow_temaplate_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
-    onedata_workflow_id = models.CharField("Onedata Workflow ID", max_length=200)
     # Generic relation to Project, Dataset, or Experiment
     root_resource_content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
         help_text="Content type of the related object (Project, Dataset, or Experiment)",
-        null=False,
-        blank=False,
+        null=True,
+        blank=True,
     )
     root_resource_id = models.UUIDField(
         help_text="ID of the related object (Project, Dataset, or Experiment)",
-        null=False,
-        blank=False,
+        null=True,
+        blank=True,
     )
     root_resource_object = GenericForeignKey('root_resource_content_type', 'root_resource_id')
     onedata_workflow_execution_id = models.CharField("Onedata Workflow Execution ID", max_length=200, blank=True, null=True, editable=False)
@@ -515,7 +514,33 @@ class Job(PermsObject):
             raise ValueError(f"Cannot change job status from {self.status} to {new_status}. Invalid transition.")
         
         self.save(update_fields=["status"])
- 
+
+    def get_project(self):
+        """
+        Get the project associated with this job by resolving the root resource chain.
+
+        Returns:
+            Project: The project associated with this job's root resource
+
+        Raises:
+            ValueError: If the root resource type is not supported or if resolution fails
+        """
+        # Get the root resource object
+        root_resource = self.root_resource_content_type.get_object_for_this_type(pk=self.root_resource_id)
+
+        # Determine the project based on the resource type
+        if root_resource.__class__.__name__ == 'Project':
+            # Direct project reference
+            return root_resource
+        elif root_resource.__class__.__name__ == 'Dataset':
+            # Dataset - get project directly
+            return root_resource.project
+        elif root_resource.__class__.__name__ == 'Experiment':
+            # Experiment - get project via dataset
+            return root_resource.dataset.project
+        else:
+            raise ValueError(f"Unsupported root resource type: {root_resource.__class__.__name__}. Expected Project, Dataset, or Experiment.")
+
 class JobParams:
     def __init__(self, inputFile: str, outputFile: str, appConfig: str):
         if not inputFile or not isinstance(inputFile, str) or not inputFile.strip():

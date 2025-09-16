@@ -264,7 +264,9 @@ def verify_job(job: Job):
 
     logger.info(f"Verifying input file {input_file} existence - needs to be folder.")
 
-    project = job.workflow_temaplate_id.project_id
+    # Get the project from the job using the centralized method
+    project = job.get_project()
+
     logger.info(f"Project: {project}")
     metadata, error = get_file_metadata(project, input_file)
     if error:
@@ -281,14 +283,19 @@ def verify_job(job: Job):
 
 def send_job(job: Job):
     logger.info("Sending job for processing...")
-    project = job.workflow_temaplate_id.project_id
+
+    # Get the project from the job using the centralized method
+    project = job.get_project()
+
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = project.facility.onedata_provider_url
+    logger.info(f"Creating workflow execution host: {oneprovider_configuration.host}")
     oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
+    logger.info(f"Creating workflow execution api key: {oneprovider_configuration.api_key['X-Auth-Token'] }")
     workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
 
     body = {
-        "spaceId": f"{job.workflow_temaplate_id.project_id.onedata_space_id}",
+        "spaceId": f"{project.onedata_space_id}",
         "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.onedata_workflow_id}",
         "atmWorkflowSchemaRevisionNumber": 3,
         "storeInitialContentOverlay": {
@@ -319,7 +326,9 @@ def send_job(job: Job):
 
 def get_job_status(job: Job):
     logger.info(f"Getting status for job with id {job.id}")
-    project = job.workflow_temaplate_id.project_id
+
+    # Get the project from the job using the centralized method
+    project = job.get_project()
 
     # TODO: this code will be used once we use onedata client for workflow exectuion details
     # oneprovider_configuration = oneprovider_client.configuration.Configuration()
@@ -367,9 +376,17 @@ def verify_workflow_existence(workflow: WorkflowTemplate):
     Verify that the workflow with the given ID exists in the Oneprovider.
     """
     logger.info(f"Verifying workflow with id {workflow.onedata_workflow_id} exists in onedata")
+
+    # Get any project that supports this workflow template
+    projects = workflow.supported_projects.all()
+    if not projects.exists():
+        raise ValueError("No projects support this workflow template")
+
+    project = projects.first()
+
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
-    oneprovider_configuration.host = workflow.project_id.facility.onedata_provider_url
-    oneprovider_configuration.api_key['X-Auth-Token'] = workflow.project_id.facility.onedata_token
+    oneprovider_configuration.host = project.facility.onedata_provider_url
+    oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
     workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
     
     try:

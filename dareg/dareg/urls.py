@@ -24,6 +24,7 @@ router.register(r"experiments", views.ExperimentViewSet, basename='experiment')
 router.register(r'query', GeneralSearchViewSet, basename='query')
 router.register(r"experiments", views.ExperimentViewSet, basename= 'experiment')
 router.register(r"workflow", views.WorkflowTemplateViewSet, basename='workflow')
+router.register(r"jobs", views.JobViewSet, basename='job')
 
 urlpatterns = [
     path("api/v1/", include(router.urls)),

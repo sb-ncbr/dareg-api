@@ -503,12 +503,13 @@ class JobViewSet(viewsets.ModelViewSet):
     # Override the create method to set the created_by field and perform validation
     def perform_create(self, serializer):
         logger.info("Creating a job viewset")
-        job = serializer.validated_data
-        verify_job(job)
 
-        logger.info(f"Saving job with id {job.id}")
-        # Check permissions for the workflow template creation
-        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+        # Save the job first to create the actual Job instance
+        job_instance = serializer.save(created_by=self.request.user, modified_by=self.request.user)
+        logger.info(f"Saved job with id {job_instance.id}")
+
+        # Now verify the job with the actual Job instance
+        verify_job(job_instance)
 
 # create a class that represents job input parameters inputFile, outputFile, 
 class JobParams:
