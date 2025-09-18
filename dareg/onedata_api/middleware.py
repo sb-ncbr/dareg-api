@@ -286,7 +286,7 @@ def send_job(job: Job):
 
     # Get the project from the job using the centralized method
     project = job.get_project()
-
+    logger.info(f"Creating workflow execution project: {project}")
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = project.facility.onedata_provider_url
     logger.info(f"Creating workflow execution host: {oneprovider_configuration.host}")
@@ -297,10 +297,10 @@ def send_job(job: Job):
     body = {
         "spaceId": f"{project.onedata_space_id}",
         "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.onedata_workflow_id}",
-        "atmWorkflowSchemaRevisionNumber": 3,
+        "atmWorkflowSchemaRevisionNumber": int(job.workflow_temaplate_id.revision),
         "storeInitialContentOverlay": {
             f"{job.workflow_temaplate_id.input_params['inputFile']}": {
-                "fileId": f"{job.input_params['inputFile']}"
+                "fileId": f"{job.root_resource_object.onedata_space_id if hasattr(job.root_resource_object, 'onedata_space_id') and not hasattr(job.root_resource_object, 'onedata_file_id') else job.root_resource_object.onedata_file_id}"
             },
             f"{job.workflow_temaplate_id.input_params['outputFile']}": {
                 "fileId": f"{job.input_params['outputFile']}"
@@ -313,9 +313,10 @@ def send_job(job: Job):
     logger.info(f"Creating workflow execution with body: {body}")
     # receipt the respone and get atmWorkflowExecutionId from response schema
     try:
-        # TODO: What if we fail before changing the status tu running or before storing execution ID?
+        # TODO: What if we fail before changing the status tu running or before storing execution ID? - introduce status assigning
         response = workflow_client.schedule_workflow_execution(body)
         logger.info(f"Workflow execution created successfully.")
+        # TODO: make it assigned
         job.set_status(JobStatus.RUNNING)
         logger.info(f"Workflow execution ID: {response}")
         job.onedata_workflow_execution_id = response.atm_workflow_execution_id
@@ -378,16 +379,16 @@ def verify_workflow_existence(workflow: WorkflowTemplate):
     logger.info(f"Verifying workflow with id {workflow.onedata_workflow_id} exists in onedata")
 
     # Get any project that supports this workflow template
-    projects = workflow.supported_projects.all()
-    if not projects.exists():
-        raise ValueError("No projects support this workflow template")
+    # projects = workflow.supported_projects.all()
+    # if not projects.exists():
+    #     raise ValueError("No projects support this workflow template")
 
-    project = projects.first()
+    # project = projects.first()
 
-    oneprovider_configuration = oneprovider_client.configuration.Configuration()
-    oneprovider_configuration.host = project.facility.onedata_provider_url
-    oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
-    workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
+    # oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    # oneprovider_configuration.host = project.facility.onedata_provider_url
+    # oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
+    # workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
     
     try:
         # TODO: Verify that the workflow with this ID exists
