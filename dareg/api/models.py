@@ -435,9 +435,10 @@ class WorkflowTemplate(PermsObject):
 
 class JobStatus(StrEnum):
     NEW = "new"
+    # TODO: detect jobs in assigning state and find out how to verify it is not already running
+    ASSIGNING = "assigning"
+    ASSIGNED = "assigned"
     RUNNING = "running"
-    # TODO: Implement scheduling state?
-    SCHEDULING = "scheduling"
     SUCCESS = "success"
     FAILURE = "failure"
 
@@ -506,7 +507,11 @@ class Job(PermsObject):
         if self.status == new_status:
             logger.info(f"Job {self.id} status is already {new_status}. No change needed.")
             return
-        if self.status == JobStatus.NEW and new_status == JobStatus.RUNNING:
+        if self.status == JobStatus.NEW and new_status == JobStatus.ASSIGNING:
+            self.status = new_status
+        elif self.status == JobStatus.ASSIGNING and new_status == JobStatus.ASSIGNED:
+            self.status = new_status
+        elif self.status == JobStatus.ASSIGNED and new_status == JobStatus.RUNNING:
             self.status = new_status
         elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
             self.status = new_status
@@ -542,21 +547,37 @@ class Job(PermsObject):
             raise ValueError(f"Unsupported root resource type: {root_resource.__class__.__name__}. Expected Project, Dataset, or Experiment.")
 
 class JobParams:
-    def __init__(self, inputFile: str, outputFile: str, appConfig: str):
-        if not inputFile or not isinstance(inputFile, str) or not inputFile.strip():
-            raise ValueError("inputFile must be a non-empty string")
+    def __init__(self, outputFile: str, appConfig: str):
         if not outputFile or not isinstance(outputFile, str) or not outputFile.strip():
             raise ValueError("outputFile must be a non-empty string")
         if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
             raise ValueError("appConfig must be a non-empty string")
-        self.inputFile = inputFile
         self.outputFile = outputFile
         self.appConfig = appConfig
 
     @classmethod
     def from_dict(cls, data):
         return cls(
-            inputFile=data.get('inputFile'),
             outputFile=data.get('outputFile'),
+            appConfig=data.get('appConfig')
+        )
+
+class WorkflowParams:
+    def __init__(self, onedataInputStore: str, onedataOutputStore: str, appConfig: str):
+        if not onedataInputStore or not isinstance(onedataInputStore, str) or not onedataInputStore.strip():
+            raise ValueError("onedataInputStore must be a non-empty string")
+        if not onedataOutputStore or not isinstance(onedataOutputStore, str) or not onedataOutputStore.strip():
+            raise ValueError("onedataOutputStore must be a non-empty string")
+        if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
+            raise ValueError("appConfig must be a non-empty string")
+        self.onedataInputStore = onedataInputStore
+        self.onedataOutputStore = onedataOutputStore
+        self.appConfig = appConfig
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            onedataInputStore=data.get('onedataInputStore'),
+            onedataOutputStore=data.get('onedataOutputStore'),
             appConfig=data.get('appConfig')
         )

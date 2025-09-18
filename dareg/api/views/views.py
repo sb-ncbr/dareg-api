@@ -40,7 +40,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
-    create_new_experiment, create_new_temp_token, get_file_metadata, verify_job
+    create_new_experiment, create_new_temp_token, get_file_metadata, verify_job, verify_workflow_template, verify_workflow_existence
 
 logger = logging.getLogger(__name__)
 
@@ -485,6 +485,17 @@ class WorkflowTemplateViewSet(viewsets.ModelViewSet):
         WorkflowTemplate.clean()
         # Check permissions for the workflow template creation
         serializer.save(created_by=self.request.user)
+
+    # Override the update method to validate workflow parameters
+    def perform_update(self, serializer):
+        logger.info("Updating workflow template in API viewset")
+        # Save the instance first to get the updated WorkflowTemplate object
+        instance = serializer.save(modified_by=self.request.user)
+        logger.info(f"Validating updated workflow template with id {instance.id}")
+        # Validate workflow parameters (same as admin does)
+        verify_workflow_template(instance)
+        verify_workflow_existence(instance)
+        logger.info(f"Workflow template {instance.id} updated and validated successfully")
 
 
 class JobViewSet(viewsets.ModelViewSet):

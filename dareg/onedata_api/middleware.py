@@ -15,7 +15,7 @@ from onedata_wrapper.models.filesystem.entry_request import EntryRequest
 from onedata_wrapper.models.filesystem.new_directory_request import NewDirectoryRequest
 from onedata_wrapper.models.share.new_share_request import NewShareRequest
 from onedata_wrapper.selectors.file_attribute import ALL as FA_ALL
-from api.models import Job, JobParams, JobStatus, Project, Dataset, Facility, WorkflowTemplate
+from api.models import Job, JobParams, JobStatus, Project, Dataset, Facility, WorkflowTemplate, WorkflowParams
 import base64
 
 logger = logging.getLogger(__name__)
@@ -259,20 +259,14 @@ def verify_job(job: Job):
     except Exception as e:
         raise ValueError(f"Failed to deserialize input_params: {e}")
     
-    input_file = job_params.inputFile
     output_file = job_params.outputFile
 
-    logger.info(f"Verifying input file {input_file} existence - needs to be folder.")
+    logger.info(f"Job params validated successfully.")
 
     # Get the project from the job using the centralized method
     project = job.get_project()
 
     logger.info(f"Project: {project}")
-    metadata, error = get_file_metadata(project, input_file)
-    if error:
-        raise ValueError(f"Input file validation failed: {error}")
-    else:
-        logger.info(f"Input file metadata: {metadata}")        
 
     logger.info(f"Verifying output file existence - needs to be folder: {output_file}")
     metadata, error = get_file_metadata(project, output_file)
@@ -299,10 +293,10 @@ def send_job(job: Job):
         "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.onedata_workflow_id}",
         "atmWorkflowSchemaRevisionNumber": int(job.workflow_temaplate_id.revision),
         "storeInitialContentOverlay": {
-            f"{job.workflow_temaplate_id.input_params['inputFile']}": {
+            f"{job.workflow_temaplate_id.input_params['onedataInputStore']}": {
                 "fileId": f"{job.root_resource_object.onedata_space_id if hasattr(job.root_resource_object, 'onedata_space_id') and not hasattr(job.root_resource_object, 'onedata_file_id') else job.root_resource_object.onedata_file_id}"
             },
-            f"{job.workflow_temaplate_id.input_params['outputFile']}": {
+            f"{job.workflow_temaplate_id.input_params['onedataOutputStore']}": {
                 "fileId": f"{job.input_params['outputFile']}"
             }
         },
@@ -311,16 +305,21 @@ def send_job(job: Job):
     }
 
     logger.info(f"Creating workflow execution with body: {body}")
+
+    # Set job status to assigning before sending to OneData
+    job.set_status(JobStatus.ASSIGNING)
+    logger.info(f"Job status set to ASSIGNING")
+
     # receipt the respone and get atmWorkflowExecutionId from response schema
     try:
-        # TODO: What if we fail before changing the status tu running or before storing execution ID? - introduce status assigning
         response = workflow_client.schedule_workflow_execution(body)
         logger.info(f"Workflow execution created successfully.")
-        # TODO: make it assigned
-        job.set_status(JobStatus.RUNNING)
-        logger.info(f"Workflow execution ID: {response}")
+
+        # Set job status to assigned and store execution ID when OneData responds successfully
         job.onedata_workflow_execution_id = response.atm_workflow_execution_id
-        job.save() 
+        job.set_status(JobStatus.ASSIGNED)
+        job.save()
+        logger.info(f"Job status set to ASSIGNED with execution ID: {response.atm_workflow_execution_id}") 
     except Exception as e:
         logger.error(f"Failed to create workflow execution: {e}")
         raise
@@ -348,6 +347,9 @@ def get_job_status(job: Job):
         elif status != "finished" and status != "active":
             logger.info(f"Job {job.id} finished with failure.")
             job.set_status(JobStatus.FAILURE)
+        elif status == "active":
+            logger.info(f"Job {job.id} is still running.")
+            job.set_status(JobStatus.RUNNING)
         else:
             logger.info(f"Job {job.id} has status {status}.")
     else:
@@ -401,11 +403,10 @@ def verify_workflow_existence(workflow: WorkflowTemplate):
 def verify_workflow_template(workflow: WorkflowTemplate):
     logger.info(f"Verifying inputsTemplate for workflow with id {workflow.onedata_workflow_id} in onedata")
     assert workflow.input_params is not None, "'inputsTemplate' is missing in schema"
-    required_keys = {"inputFile", "outputFile", "appConfig"}
-    assert required_keys.issubset(workflow.input_params.keys()), \
-        f"'inputsTemplate' must contain keys: {required_keys}"
-    for key in required_keys:
-        assert isinstance(workflow.input_params[key], str), f"{key} must be a string (store_id)"
-    logger.info(f"InputsTemplate for workflow with id {workflow.onedata_workflow_id} is valid")
+    try:
+        workflow_params = WorkflowParams.from_dict(workflow.input_params)
+        logger.info(f"InputsTemplate for workflow with id {workflow.onedata_workflow_id} is valid")
+    except Exception as e:
+        raise ValueError(f"Failed to validate workflow input_params: {e}")
 
     # TODO: Verify that workflow stores exist
