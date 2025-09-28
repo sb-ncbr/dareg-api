@@ -482,6 +482,7 @@ class Job(PermsObject):
     end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True, editable=False)
     log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20, blank=True)
     job_submission_counter = models.IntegerField("Job Submission Counter", default=0, help_text="Number of times job submission has been attempted")
+    job_polling_counter = models.IntegerField("Job Polling Counter", default=0, help_text="Number of times job status polling has failed")
 
 
     def clean(self):
@@ -518,8 +519,9 @@ class Job(PermsObject):
             self.status = new_status
         elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
             self.status = new_status
-        elif new_status == JobStatus.UNKNOWN_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING]:
-            # Allow transition to UNKNOWN_ERROR from NEW or ASSIGNING states for submission failures
+        elif new_status == JobStatus.UNKNOWN_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING, JobStatus.ASSIGNED, JobStatus.RUNNING]:
+            # Allow transition to UNKNOWN_ERROR from NEW/ASSIGNING states for submission failures
+            # or ASSIGNED/RUNNING states for polling failures
             self.status = new_status
         else:
             raise ValueError(f"Cannot change job status from {self.status} to {new_status}. Invalid transition.")

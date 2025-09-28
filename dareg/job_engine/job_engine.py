@@ -37,10 +37,6 @@ class JobEngine:
                     self.logger.error(f"Job {job.id} failed 3 times, setting status to UNKNOWN_ERROR")
                     job.set_status(JobStatus.UNKNOWN_ERROR)
                 else:
-                    # Reset status to NEW for retry (if it was changed to ASSIGNING by send_job)
-                    if job.status != JobStatus.NEW:
-                        job.status = JobStatus.NEW
-                        job.save(update_fields=['status'])
                     self.logger.info(f"Job {job.id} will be retried. Attempts: {job.job_submission_counter}/3")
         self.logger.info("JobEngine finished scheduling.")
 
@@ -52,7 +48,33 @@ class JobEngine:
         max_jobs = getattr(settings, "JOB_ENGINE_POLL_LIMIT", JOB_ENGINE_POLL_LIMIT)
         jobs = Job.objects.filter(status__in=[JobStatus.RUNNING, JobStatus.ASSIGNED]).order_by('created')[:max_jobs]
         for job in jobs:
-            status = job.status
-            get_job_status(job)
-            self.logger.info(f"Job ID: {job.id}, OldStatus: {status}, NewStatus: {job.status}")
+            old_status = job.status
+            try:
+                self.logger.info(f"Polling job {job.id} status (polling attempt {job.job_polling_counter + 1})")
+
+                # Call get_job_status which may raise an exception
+                get_job_status(job)
+
+                # If successful, reset polling counter
+                if job.job_polling_counter > 0:
+                    job.job_polling_counter = 0
+                    job.save(update_fields=['job_polling_counter'])
+
+                self.logger.info(f"Job ID: {job.id}, OldStatus: {old_status}, NewStatus: {job.status}")
+
+            except Exception as e:
+                self.logger.error(f"Error polling job {job.id} status: {e}")
+
+                # Increment polling counter
+                job.job_polling_counter += 1
+
+                # Check if this was the third failed polling attempt
+                if job.job_polling_counter >= 3:
+                    self.logger.error(f"Job {job.id} polling failed 3 times, setting status to UNKNOWN_ERROR")
+                    job.set_status(JobStatus.UNKNOWN_ERROR)
+                else:
+                    # Save the incremented counter but keep current status for retry
+                    job.save(update_fields=['job_polling_counter'])
+                    self.logger.info(f"Job {job.id} polling will be retried. Failed attempts: {job.job_polling_counter}/3")
+
         self.logger.info("JobEngine finished polling.")

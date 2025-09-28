@@ -368,7 +368,8 @@ def get_job_status(job: Job):
             logger.info(f"Job {job.id} has status {status}.")
     else:
         logger.error(f"Failed to poll workflow execution: status not available.")
-        # TODO: handle properly - try several times, if not available, set to failure
+        # Raise exception to trigger polling failure counter logic
+        raise Exception("Failed to poll workflow execution: status not available")
 
 # TODO: Drop this function once library fix is introduced
 def fetch_workflow_status_via_http(project, onedata_workflow_execution_id):
