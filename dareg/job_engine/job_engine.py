@@ -3,9 +3,11 @@ import logging
 from django.conf import settings
 
 
-# Module-level constant for default job engine limit
+# Module-level constant for default job engine limits
 JOB_ENGINE_SUBMIT_LIMIT: int = 20
 JOB_ENGINE_POLL_LIMIT: int = 20
+JOB_ENGINE_RECOVERY_LIMIT: int = 10
+JOB_ENGINE_RECOVERY_TIMEOUT_MINUTES: int = 5
 
 class JobEngine:
 
@@ -95,3 +97,63 @@ class JobEngine:
                     self.logger.info(f"Job {job.id} polling will be retried. Failed attempts: {job.job_polling_counter}/3")
 
         self.logger.info("JobEngine finished polling.")
+
+    def recover(self):
+        """
+        Recovery cycle to handle jobs stuck in ASSIGNING state.
+
+        Jobs stuck in ASSIGNING state for more than 5 minutes are recovered by:
+        - If job has execution_id: move to ASSIGNED status
+        - If job has no execution_id: move back to NEW status for retry
+        """
+        from api.models import Job, JobStatus
+        from django.utils import timezone
+        from datetime import timedelta
+
+        self.logger.info("JobEngine started recovery cycle")
+
+        # Calculate timeout threshold
+        timeout_minutes = getattr(settings, "JOB_ENGINE_RECOVERY_TIMEOUT_MINUTES", JOB_ENGINE_RECOVERY_TIMEOUT_MINUTES)
+        timeout_threshold = timezone.now() - timedelta(minutes=timeout_minutes)
+
+        max_jobs = getattr(settings, "JOB_ENGINE_RECOVERY_LIMIT", JOB_ENGINE_RECOVERY_LIMIT)
+
+        # Find jobs stuck in ASSIGNING state for more than timeout_minutes
+        stuck_jobs = Job.objects.filter(
+            status=JobStatus.ASSIGNING,
+            claimed=False,  # Only process unclaimed jobs
+            modified__lt=timeout_threshold  # Modified more than timeout_minutes ago
+        ).order_by('modified')[:max_jobs]
+
+        if stuck_jobs.exists():
+            self.logger.info(f"Found {stuck_jobs.count()} jobs stuck in ASSIGNING state for recovery")
+
+        for job in stuck_jobs:
+            # Try to claim the job atomically for recovery
+            if not job.claim_job():
+                self.logger.info(f"Job {job.id} already claimed by another worker for recovery, skipping")
+                continue
+
+            try:
+                minutes_stuck = (timezone.now() - job.modified).total_seconds() / 60
+                self.logger.info(f"Recovering job {job.id} stuck in ASSIGNING for {minutes_stuck:.1f} minutes")
+
+                if job.onedata_workflow_execution_id:
+                    # Job has execution ID, likely submitted successfully but status not updated
+                    self.logger.info(f"Job {job.id} has execution ID {job.onedata_workflow_execution_id}, moving to ASSIGNED")
+                    job.set_status(JobStatus.ASSIGNED)
+                else:
+                    # Job has no execution ID, submission likely failed, retry
+                    self.logger.info(f"Job {job.id} has no execution ID, moving back to NEW for retry")
+                    job.set_status(JobStatus.NEW)
+
+                # Release claim after recovery
+                job.unclaim_job()
+                self.logger.info(f"Job {job.id} recovered successfully")
+
+            except Exception as e:
+                self.logger.error(f"Error recovering job {job.id}: {e}")
+                # Release claim on error
+                job.unclaim_job()
+
+        self.logger.info("JobEngine finished recovery cycle")

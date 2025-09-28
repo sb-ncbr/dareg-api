@@ -518,6 +518,9 @@ class Job(PermsObject):
             self.status = new_status
         elif self.status == JobStatus.ASSIGNING and new_status == JobStatus.ASSIGNED:
             self.status = new_status
+        elif self.status == JobStatus.ASSIGNING and new_status == JobStatus.NEW:
+            # Allow transition back to NEW for recovery purposes (stuck jobs without execution ID)
+            self.status = new_status
         elif self.status == JobStatus.ASSIGNED and new_status == JobStatus.RUNNING:
             self.status = new_status
         elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
