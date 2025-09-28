@@ -288,6 +288,19 @@ def send_job(job: Job):
     logger.info(f"Creating workflow execution api key: {oneprovider_configuration.api_key['X-Auth-Token'] }")
     workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
 
+    # Parse appConfig from workflow template and job, merge with job taking precedence
+    workflow_app_config = json.loads(job.workflow_temaplate_id.input_params['appConfig'])
+    job_app_config = json.loads(job.input_params['appConfig'])
+
+    # Merge appConfigs with job appConfig taking precedence
+    merged_app_config = {**workflow_app_config, **job_app_config}
+
+    # Extract storeId from workflow template appConfig (not from merged)
+    store_id = workflow_app_config['storeId']
+
+    # Remove storeId from merged config as it's used as the store key
+    store_config = {k: v for k, v in merged_app_config.items() if k != 'storeId'}
+
     body = {
         "spaceId": f"{project.onedata_space_id}",
         "atmWorkflowSchemaId": f"{job.workflow_temaplate_id.onedata_workflow_id}",
@@ -298,7 +311,8 @@ def send_job(job: Job):
             },
             f"{job.workflow_temaplate_id.input_params['onedataOutputStore']}": {
                 "fileId": f"{job.input_params['outputFile']}"
-            }
+            },
+            f"{store_id}": store_config
         },
         "logLevel": "debug",
         "callback": "https://my-server.example.com/execution-callback"

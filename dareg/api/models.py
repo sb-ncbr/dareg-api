@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import json
 import os
 import uuid
 import datetime
@@ -456,6 +457,7 @@ class JobLogLevel(StrEnum):
         return [(key.value, key.name) for key in cls]
 
 class Job(PermsObject):
+    # TODO: fix typo in migration
     workflow_temaplate_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
     # Generic relation to Project, Dataset, or Experiment
     root_resource_content_type = models.ForeignKey(
@@ -570,6 +572,14 @@ class WorkflowParams:
             raise ValueError("onedataOutputStore must be a non-empty string")
         if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
             raise ValueError("appConfig must be a non-empty string")
+
+        # Validate that appConfig is valid JSON and contains storeId
+        try:
+            app_config_data = json.loads(appConfig)
+            if 'storeId' not in app_config_data:
+                raise ValueError("appConfig must contain a 'storeId' field")
+        except json.JSONDecodeError:
+            raise ValueError("appConfig must be valid JSON")
         self.onedataInputStore = onedataInputStore
         self.onedataOutputStore = onedataOutputStore
         self.appConfig = appConfig
