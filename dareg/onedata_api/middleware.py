@@ -289,7 +289,7 @@ def send_job(job: Job):
     workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
 
     # Parse appConfig from workflow template and job, merge with job taking precedence
-    workflow_app_config = json.loads(job.workflow_template_id.input_params['appConfig'])
+    workflow_app_config = json.loads(job.workflow_template.input_params['appConfig'])
     job_app_config = json.loads(job.input_params['appConfig'])
 
     # Merge appConfigs with job appConfig taking precedence
@@ -303,13 +303,13 @@ def send_job(job: Job):
 
     body = {
         "spaceId": f"{project.onedata_space_id}",
-        "atmWorkflowSchemaId": f"{job.workflow_template_id.onedata_workflow_id}",
-        "atmWorkflowSchemaRevisionNumber": int(job.workflow_template_id.revision),
+        "atmWorkflowSchemaId": f"{job.workflow_template.onedata_workflow_id}",
+        "atmWorkflowSchemaRevisionNumber": int(job.workflow_template.revision),
         "storeInitialContentOverlay": {
-            f"{job.workflow_template_id.input_params['onedataInputStore']}": {
+            f"{job.workflow_template.input_params['onedataInputStore']}": {
                 "fileId": f"{job.root_resource_object.onedata_space_id if hasattr(job.root_resource_object, 'onedata_space_id') and not hasattr(job.root_resource_object, 'onedata_file_id') else job.root_resource_object.onedata_file_id}"
             },
-            f"{job.workflow_template_id.input_params['onedataOutputStore']}": {
+            f"{job.workflow_template.input_params['onedataOutputStore']}": {
                 "fileId": f"{job.input_params['outputFile']}"
             },
             f"{store_id}": store_config

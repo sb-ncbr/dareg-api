@@ -442,6 +442,7 @@ class JobStatus(StrEnum):
     RUNNING = "running"
     SUCCESS = "success"
     FAILURE = "failure"
+    UNKNOWN_ERROR = "unknownError"
 
     @classmethod
     def choices(cls):
@@ -457,7 +458,7 @@ class JobLogLevel(StrEnum):
         return [(key.value, key.name) for key in cls]
 
 class Job(PermsObject):
-    workflow_template_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
+    workflow_template = models.ForeignKey(WorkflowTemplate, models.PROTECT)
     # Generic relation to Project, Dataset, or Experiment
     root_resource_content_type = models.ForeignKey(
         ContentType,
@@ -480,6 +481,7 @@ class Job(PermsObject):
     start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True, editable=False)
     end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True, editable=False)
     log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20, blank=True)
+    job_submission_counter = models.IntegerField("Job Submission Counter", default=0, help_text="Number of times job submission has been attempted")
 
 
     def clean(self):
@@ -515,6 +517,9 @@ class Job(PermsObject):
         elif self.status == JobStatus.ASSIGNED and new_status == JobStatus.RUNNING:
             self.status = new_status
         elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
+            self.status = new_status
+        elif new_status == JobStatus.UNKNOWN_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING]:
+            # Allow transition to UNKNOWN_ERROR from NEW or ASSIGNING states for submission failures
             self.status = new_status
         else:
             raise ValueError(f"Cannot change job status from {self.status} to {new_status}. Invalid transition.")
