@@ -457,8 +457,7 @@ class JobLogLevel(StrEnum):
         return [(key.value, key.name) for key in cls]
 
 class Job(PermsObject):
-    # TODO: fix typo in migration
-    workflow_temaplate_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
+    workflow_template_id = models.ForeignKey(WorkflowTemplate, models.PROTECT)
     # Generic relation to Project, Dataset, or Experiment
     root_resource_content_type = models.ForeignKey(
         ContentType,
