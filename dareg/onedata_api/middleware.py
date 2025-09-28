@@ -332,6 +332,7 @@ def send_job(job: Job):
         # Set job status to assigned and store execution ID when OneData responds successfully
         job.onedata_workflow_execution_id = response.atm_workflow_execution_id
         job.set_status(JobStatus.ASSIGNED)
+        job.unclaim_job()  # Release claim now that job is successfully submitted
         job.save()
         logger.info(f"Job status set to ASSIGNED with execution ID: {response.atm_workflow_execution_id}") 
     except Exception as e:
@@ -358,9 +359,15 @@ def get_job_status(job: Job):
         if status == "finished":
             logger.info(f"Job {job.id} finished successfully.")
             job.set_status(JobStatus.SUCCESS)
+            # Unclaim job since it reached final state
+            if job.claimed:
+                job.unclaim_job()
         elif status != "finished" and status != "active":
             logger.info(f"Job {job.id} finished with failure.")
             job.set_status(JobStatus.FAILURE)
+            # Unclaim job since it reached final state
+            if job.claimed:
+                job.unclaim_job()
         elif status == "active":
             logger.info(f"Job {job.id} is still running.")
             job.set_status(JobStatus.RUNNING)

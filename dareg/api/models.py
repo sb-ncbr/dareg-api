@@ -442,7 +442,8 @@ class JobStatus(StrEnum):
     RUNNING = "running"
     SUCCESS = "success"
     FAILURE = "failure"
-    UNKNOWN_ERROR = "unknownError"
+    SUBMISSION_ERROR = "submissionError"
+    POLLING_ERROR = "pollingError"
 
     @classmethod
     def choices(cls):
@@ -483,6 +484,8 @@ class Job(PermsObject):
     log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20, blank=True)
     job_submission_counter = models.IntegerField("Job Submission Counter", default=0, help_text="Number of times job submission has been attempted")
     job_polling_counter = models.IntegerField("Job Polling Counter", default=0, help_text="Number of times job status polling has failed")
+    claimed = models.BooleanField("Job Claimed", default=False, help_text="Whether this job is currently claimed by a worker for processing")
+    claimed_at = models.DateTimeField("Claimed At", null=True, blank=True, help_text="Timestamp when the job was claimed")
 
 
     def clean(self):
@@ -519,14 +522,51 @@ class Job(PermsObject):
             self.status = new_status
         elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
             self.status = new_status
-        elif new_status == JobStatus.UNKNOWN_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING, JobStatus.ASSIGNED, JobStatus.RUNNING]:
-            # Allow transition to UNKNOWN_ERROR from NEW/ASSIGNING states for submission failures
-            # or ASSIGNED/RUNNING states for polling failures
+        elif new_status == JobStatus.SUBMISSION_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING]:
+            # Allow transition to SUBMISSION_ERROR from NEW/ASSIGNING states for submission failures
+            self.status = new_status
+        elif new_status == JobStatus.POLLING_ERROR and self.status in [JobStatus.ASSIGNED, JobStatus.RUNNING]:
+            # Allow transition to POLLING_ERROR from ASSIGNED/RUNNING states for polling failures
             self.status = new_status
         else:
             raise ValueError(f"Cannot change job status from {self.status} to {new_status}. Invalid transition.")
         
         self.save(update_fields=["status"])
+
+    def claim_job(self):
+        """
+        Atomically claim this job for processing.
+
+        Returns:
+            bool: True if the job was successfully claimed, False if already claimed
+        """
+        from django.utils import timezone
+        from django.db import transaction
+
+        with transaction.atomic():
+            # Use select_for_update to ensure atomicity
+            job = Job.objects.select_for_update().get(pk=self.pk)
+
+            if job.claimed:
+                return False  # Job already claimed
+
+            job.claimed = True
+            job.claimed_at = timezone.now()
+            job.save(update_fields=['claimed', 'claimed_at'])
+
+            # Update the current instance
+            self.claimed = job.claimed
+            self.claimed_at = job.claimed_at
+
+            return True
+
+    def unclaim_job(self):
+        """
+        Release the claim on this job.
+        """
+        self.claimed = False
+        self.claimed_at = None
+        self.save(update_fields=['claimed', 'claimed_at'])
 
     def get_project(self):
         """
