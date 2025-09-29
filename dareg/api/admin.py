@@ -315,6 +315,7 @@ class JobAdmin(BaseModelAdmin):
     from rest_framework.exceptions import MethodNotAllowed
     list_display = ('name', 'status') + BaseModelAdmin.list_display
     search_fields = ('name', 'status')
+    exclude = ('job_submission_counter', 'job_polling_counter', 'claimed', 'claimed_at')
 
     def save_model(self, request, obj, form, change):
         if change:

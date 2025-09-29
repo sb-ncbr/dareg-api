@@ -247,7 +247,12 @@ class WorkflowTemplateSerializer(serializers.ModelSerializer):
 class JobSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job
-        fields = "__all__"
+        fields = [
+            'created', 'modified', 'id', 'created_by', 'modified_by',
+            'workflow_template', 'root_resource_content_type', 'root_resource_id',
+            'name', 'description', 'status',
+            'input_params', 'start_time', 'end_time', 'log_level'
+        ]
         read_only_fields = ["id", "created_by", "modified_by"]
 
     def create(self, validated_data):
