@@ -318,7 +318,7 @@ def send_job(job: Job):
         "callback": "https://my-server.example.com/execution-callback"
     }
 
-    logger.info(f"Creating workflow execution with body: {body}")
+    logger.info(f"Creating workflow execution with body: {json.dumps(body, indent=2)}")
 
     # Set job status to assigning before sending to OneData
     job.set_status(JobStatus.ASSIGNING)
