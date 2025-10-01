@@ -215,7 +215,13 @@ def list_dir_children(job: Job) -> list:
     url = build_file_rest_url(job, "children")
     response = requests.get(
         url,
-        headers={"x-auth-token": job.ctx["accessToken"]},
+        headers={
+            "x-auth-token": job.ctx["accessToken"],
+            "content-type": "application/json"
+        },
+        json={
+            "attributes": ["fileId", "name", "type"]
+        },
         verify=VERIFY_SSL_CERTS,
         timeout=EXTENDED_REST_REQUEST_TIMEOUT,
     )
@@ -267,16 +273,9 @@ def calculate_dir_checksum(job: Job, algorithm: ChecksumAlgorithm) -> str:
             print(f"Traceback: {traceback.format_exc()}")
             # Append empty checksum and continue with other children
             child_checksums.append("")
-    # Concatenate all child checksums and hash the result for the DIR checksum
+    # Concatenate all child checksums with comma separator for the DIR checksum
     print(f"All child checksums: {child_checksums}")
-    concat = "".join(child_checksums).encode()
-    if algorithm == "adler32":
-        value = zlib.adler32(concat, 1)
-        dir_checksum = format(value, "x")
-    else:
-        data_hash = getattr(hashlib, algorithm)()
-        data_hash.update(concat)
-        dir_checksum = data_hash.hexdigest()
+    dir_checksum = ",".join(child_checksums)
     print(f"DIR checksum: {dir_checksum}")
     # Set checksum metadata for the directory itself
     if dir_checksum and xattr_name:
