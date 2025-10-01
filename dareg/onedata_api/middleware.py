@@ -258,8 +258,6 @@ def verify_job(job: Job):
         job_params = JobParams.from_dict(job.input_params)
     except Exception as e:
         raise ValueError(f"Failed to deserialize input_params: {e}")
-    
-    output_file = job_params.outputFile
 
     logger.info(f"Job params validated successfully.")
 
@@ -268,8 +266,16 @@ def verify_job(job: Job):
 
     logger.info(f"Project: {project}")
 
-    logger.info(f"Verifying output file existence - needs to be folder: {output_file}")
-    metadata, error = get_file_metadata(project, output_file)
+    # Verify output_resource_object exists and has onedata_file_id
+    if not job.output_resource_object:
+        raise ValueError("Output resource object is required for job execution")
+
+    if not hasattr(job.output_resource_object, 'onedata_file_id'):
+        raise ValueError(f"Output resource {job.output_resource_object.__class__.__name__} does not have onedata_file_id")
+
+    output_file_id = job.output_resource_object.onedata_file_id
+    logger.info(f"Verifying output file existence - needs to be folder: {output_file_id}")
+    metadata, error = get_file_metadata(project, output_file_id)
     if error:
         raise ValueError(f"Output file validation failed: {error}")
     else:
@@ -310,7 +316,7 @@ def send_job(job: Job):
                 "fileId": f"{job.root_resource_object.onedata_space_id if hasattr(job.root_resource_object, 'onedata_space_id') and not hasattr(job.root_resource_object, 'onedata_file_id') else job.root_resource_object.onedata_file_id}"
             },
             f"{job.workflow_template.input_params['onedataOutputStore']}": {
-                "fileId": f"{job.input_params['outputFile']}"
+                "fileId": f"{job.output_resource_object.onedata_file_id}"
             },
             f"{store_id}": store_config
         },

@@ -522,23 +522,3 @@ class JobViewSet(viewsets.ModelViewSet):
         # Now verify the job with the actual Job instance
         verify_job(job_instance)
 
-# create a class that represents job input parameters inputFile, outputFile, 
-class JobParams:
-    def __init__(self, inputFile: str, outputFile: str, appConfig: str):
-        if not inputFile or not isinstance(inputFile, str) or not inputFile.strip():
-            raise ValueError("inputFile must be a non-empty string")
-        if not outputFile or not isinstance(outputFile, str) or not outputFile.strip():
-            raise ValueError("outputFile must be a non-empty string")
-        if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
-            raise ValueError("appConfig must be a non-empty string")
-        self.inputFile = inputFile
-        self.outputFile = outputFile
-        self.appConfig = appConfig
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(
-            inputFile=data.get('inputFile'),
-            outputFile=data.get('outputFile'),
-            appConfig=data.get('appConfig')
-        )

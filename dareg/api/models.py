@@ -460,13 +460,14 @@ class JobLogLevel(StrEnum):
 
 class Job(PermsObject):
     workflow_template = models.ForeignKey(WorkflowTemplate, models.PROTECT)
-    # Generic relation to Project, Dataset, or Experiment
+    # Generic relation to Project, Dataset, or Experiment for input
     root_resource_content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
         help_text="Content type of the related object (Project, Dataset, or Experiment)",
         null=True,
         blank=True,
+        related_name='job_root_resource',
     )
     root_resource_id = models.UUIDField(
         help_text="ID of the related object (Project, Dataset, or Experiment)",
@@ -474,6 +475,21 @@ class Job(PermsObject):
         blank=True,
     )
     root_resource_object = GenericForeignKey('root_resource_content_type', 'root_resource_id')
+    # Generic relation to Dataset or Experiment for output
+    output_resource_content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="Content type of the related object (Dataset or Experiment)",
+        null=True,
+        blank=True,
+        related_name='job_output_resource',
+    )
+    output_resource_id = models.UUIDField(
+        help_text="ID of the related object (Dataset or Experiment)",
+        null=True,
+        blank=True,
+    )
+    output_resource_object = GenericForeignKey('output_resource_content_type', 'output_resource_id')
     onedata_workflow_execution_id = models.CharField("Onedata Workflow Execution ID", max_length=200, blank=True, null=True, editable=False)
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500, blank=True)
@@ -489,14 +505,25 @@ class Job(PermsObject):
 
 
     def clean(self):
+        from django.core.exceptions import ValidationError
+
         # Enforce that root_resource_content_type is only Experiment, Dataset, or Project
-        allowed_models = {"experiment", "dataset", "project"}
-        model_name = self.root_resource_content_type.model
-        if model_name not in allowed_models:
-            from django.core.exceptions import ValidationError
-            raise ValidationError({
-                "root_resource_content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{model_name}'."
-            })
+        if self.root_resource_content_type:
+            allowed_root_models = {"experiment", "dataset", "project"}
+            root_model_name = self.root_resource_content_type.model
+            if root_model_name not in allowed_root_models:
+                raise ValidationError({
+                    "root_resource_content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{root_model_name}'."
+                })
+
+        # Enforce that output_resource_content_type is only Experiment or Dataset
+        if self.output_resource_content_type:
+            allowed_output_models = {"experiment", "dataset"}
+            output_model_name = self.output_resource_content_type.model
+            if output_model_name not in allowed_output_models:
+                raise ValidationError({
+                    "output_resource_content_type": f"Job output can only be related to Experiment or Dataset, not '{output_model_name}'."
+                })
     
     def set_status(self, new_status):
         """
@@ -598,18 +625,14 @@ class Job(PermsObject):
             raise ValueError(f"Unsupported root resource type: {root_resource.__class__.__name__}. Expected Project, Dataset, or Experiment.")
 
 class JobParams:
-    def __init__(self, outputFile: str, appConfig: str):
-        if not outputFile or not isinstance(outputFile, str) or not outputFile.strip():
-            raise ValueError("outputFile must be a non-empty string")
+    def __init__(self, appConfig: str):
         if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
             raise ValueError("appConfig must be a non-empty string")
-        self.outputFile = outputFile
         self.appConfig = appConfig
 
     @classmethod
     def from_dict(cls, data):
         return cls(
-            outputFile=data.get('outputFile'),
             appConfig=data.get('appConfig')
         )
 

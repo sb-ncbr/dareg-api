@@ -250,6 +250,7 @@ class JobSerializer(serializers.ModelSerializer):
         fields = [
             'created', 'modified', 'id', 'created_by', 'modified_by',
             'workflow_template', 'root_resource_content_type', 'root_resource_id',
+            'output_resource_content_type', 'output_resource_id',
             'name', 'description', 'status',
             'input_params', 'start_time', 'end_time', 'log_level'
         ]
