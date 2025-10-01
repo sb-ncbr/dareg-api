@@ -9,6 +9,7 @@ __note__= "Part of the Onedata project. Coauthor Filip Bugos"
 
 import concurrent.futures
 import hashlib
+import json
 import os
 import queue
 import sys
@@ -102,14 +103,13 @@ AVAILABLE_CHECKSUM_ALGORITHMS: Final[FrozenSet[ChecksumAlgorithm]] = frozenset(
     get_args(ChecksumAlgorithm)
 )
 
-
-class TaskConfig(TypedDict):
-    algorithm: ChecksumAlgorithm
-    metadataKey: str
-
+class TaskConfig:
+    pass
 
 class JobArgs(TypedDict):
-    file: AtmFile
+    inputFile: AtmFile
+    outputFile: AtmFile
+    config: dict[str, str]
 
 
 class FileChecksumReport(TypedDict):
@@ -140,14 +140,6 @@ def handle(
     job_batch_request: AtmJobBatchRequest[JobArgs, TaskConfig],
     heartbeat_callback: AtmHeartbeatCallback,
 ) -> Union[AtmException, AtmJobBatchResponse[JobResults]]:
-    algorithm = job_batch_request["ctx"]["config"]["algorithm"]
-    if algorithm not in AVAILABLE_CHECKSUM_ALGORITHMS:
-        return AtmException(
-            exception=(
-                f"{algorithm} algorithm is unsupported. "
-                f"Available ones are: {AVAILABLE_CHECKSUM_ALGORITHMS}"
-            )
-        )
 
     jobs_monitor = Thread(target=monitor_jobs, daemon=True, args=[heartbeat_callback])
     jobs_monitor.start()
@@ -162,18 +154,34 @@ def handle(
     _all_jobs_processed.set()
     jobs_monitor.join()
 
+    # Check if any job returned an exception
+    # for job_result in job_results:
+    #     if isinstance(job_result, AtmException):
+    #         return job_result
+
     return {"resultsBatch": job_results}
 
 
 def run_job(job: Job) -> Union[AtmException, JobResults]:
-    file_type = job.args["file"].get("type")
+    file_type = job.args["inputFile"].get("type")
     print("=== run_job called ===")
-    print(f"fileId: {job.args['file'].get('fileId')}")
+    print(f"fileId: {job.args['inputFile'].get('fileId')}")
     print(f"type: {file_type}")
     print(f"domain: {job.ctx.get('oneproviderDomain')}")
     try:
-        algorithm = job.ctx["config"]["algorithm"]
+        # Get config from job args (it's already a dict)
+        config = job.args["config"]
+        algorithm = config["algorithm"]
         print(f"algorithm: {algorithm}")
+
+        # Validate algorithm compatibility
+        if algorithm not in AVAILABLE_CHECKSUM_ALGORITHMS:
+            return AtmException(
+                exception=(
+                    f"{algorithm} algorithm is unsupported. "
+                    f"Available ones are: {AVAILABLE_CHECKSUM_ALGORITHMS}"
+                )
+            )
         if file_type == "REG":
             print("Processing REG file")
             data_stream = get_file_data_stream(job)
@@ -185,7 +193,7 @@ def run_job(job: Job) -> Union[AtmException, JobResults]:
             print("Unknown file type")
             checksum = None
 
-        xattr_name = job.ctx["config"].get("metadataKey")
+        xattr_name = config.get("metadataKey")
         print(f"xattr_name: {xattr_name}")
         print(f"checksum: {checksum}")
         if checksum and xattr_name:
@@ -217,35 +225,48 @@ def list_dir_children(job: Job) -> list:
 def calculate_dir_checksum(job: Job, algorithm: ChecksumAlgorithm) -> str:
     """Recursively calculate checksum for DIR by concatenating child checksums."""
     print("=== calculate_dir_checksum called ===")
-    print(f"DIR fileId: {job.args['file'].get('fileId')}")
+    print(f"DIR fileId: {job.args['inputFile'].get('fileId')}")
     print(f"DIR domain: {job.ctx.get('oneproviderDomain')}")
     print(f"DIR algorithm: {algorithm}")
     children = list_dir_children(job)
     print(f"DIR children count: {len(children)}")
     child_checksums = []
-    xattr_name = job.ctx["config"].get("metadataKey")
+    # Get config from job args (it's already a dict)
+    config = job.args["config"]
+    xattr_name = config.get("metadataKey")
     for child in children:
         print(f"DIR child fileId: {child.get('fileId')}, type: {child.get('type')}")
-        child_job = Job(
-            ctx=job.ctx,
-            args={"file": child}
-        )
-        file_type = child.get("type")
-        if file_type == "REG":
-            print(f"Calculating checksum for REG child {child.get('fileId')}")
-            data_stream = get_file_data_stream(child_job)
-            checksum = calculate_checksum(algorithm, data_stream)
-        elif file_type == "DIR":
-            print(f"Recursively calculating checksum for DIR child {child.get('fileId')}")
-            checksum = calculate_dir_checksum(child_job, algorithm)
-        else:
-            print(f"Unknown child type for {child.get('fileId')}")
-            checksum = ""
-        # Set checksum metadata for every child
-        print(f"Child checksum: {checksum}")
-        if checksum and xattr_name:
-            set_file_xattr(child_job, xattr_name, checksum)
-        child_checksums.append(checksum or "")
+        try:
+            child_job = Job(
+                ctx=job.ctx,
+                args={"inputFile": child, "outputFile": job.args["outputFile"], "config": job.args["config"]}
+            )
+            file_type = child.get("type")
+            if file_type == "REG":
+                print(f"Calculating checksum for REG child {child.get('fileId')}")
+                data_stream = get_file_data_stream(child_job)
+                checksum = calculate_checksum(algorithm, data_stream)
+            elif file_type == "DIR":
+                print(f"Recursively calculating checksum for DIR child {child.get('fileId')}")
+                checksum = calculate_dir_checksum(child_job, algorithm)
+            else:
+                print(f"Unknown child type for {child.get('fileId')}")
+                checksum = ""
+            # Set checksum metadata for every child
+            print(f"Child checksum: {checksum}")
+            if checksum and xattr_name:
+                try:
+                    set_file_xattr(child_job, xattr_name, checksum)
+                    print(f"Successfully set metadata for child {child.get('fileId')}")
+                except Exception as ex:
+                    print(f"Failed to set metadata for child {child.get('fileId')}: {ex}")
+                    # Continue processing other children even if this one fails
+            child_checksums.append(checksum or "")
+        except Exception as ex:
+            print(f"Error processing child {child.get('fileId')}: {ex}")
+            print(f"Traceback: {traceback.format_exc()}")
+            # Append empty checksum and continue with other children
+            child_checksums.append("")
     # Concatenate all child checksums and hash the result for the DIR checksum
     print(f"All child checksums: {child_checksums}")
     concat = "".join(child_checksums).encode()
@@ -259,15 +280,21 @@ def calculate_dir_checksum(job: Job, algorithm: ChecksumAlgorithm) -> str:
     print(f"DIR checksum: {dir_checksum}")
     # Set checksum metadata for the directory itself
     if dir_checksum and xattr_name:
-        set_file_xattr(job, xattr_name, dir_checksum)
+        try:
+            set_file_xattr(job, xattr_name, dir_checksum)
+            print(f"Successfully set metadata for DIR {job.args['inputFile'].get('fileId')}")
+        except Exception as ex:
+            print(f"Failed to set metadata for DIR {job.args['inputFile'].get('fileId')}: {ex}")
     return dir_checksum
 
 
 def build_job_results(job: Job, checksum: Optional[str]) -> JobResults:
+    # Get config from job args (it's already a dict)
+    config = job.args["config"]
     return {
         "result": {
-            "fileId": job.args["file"]["fileId"],
-            "algorithm": job.ctx["config"]["algorithm"],
+            "fileId": job.args["inputFile"]["fileId"],
+            "algorithm": config["algorithm"],
             "checksum": checksum,
         }
     }
@@ -305,8 +332,8 @@ def calculate_checksum(
 
 def set_file_xattr(job: Job, xattr_name: str, checksum: str) -> None:
     print("=== set_file_xattr called ===")
-    print(f"fileId: {job.args['file'].get('fileId')}")
-    print(f"type: {job.args['file'].get('type')}")
+    print(f"fileId: {job.args['inputFile'].get('fileId')}")
+    print(f"type: {job.args['inputFile'].get('type')}")
     print(f"domain: {job.ctx.get('oneproviderDomain')}")
     print(f"xattr_name: {xattr_name}")
     print(f"checksum: {checksum}")
@@ -333,7 +360,7 @@ def set_file_xattr(job: Job, xattr_name: str, checksum: str) -> None:
 
 def build_file_rest_url(job: Job, subpath: str) -> str:
     domain = job.ctx["oneproviderDomain"]
-    file_id = job.args["file"]["fileId"]
+    file_id = job.args["inputFile"]["fileId"]
     subpath = subpath.lstrip("/")
 
     print(f"https://{domain}/api/v3/oneprovider/data/{file_id}/{subpath}")
