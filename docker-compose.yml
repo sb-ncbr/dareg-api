@@ -45,8 +45,8 @@ services:
       - .env
     environment:
       # In production mode requests are served by Gunicorn webserver
-      PRODUCTION: false
-      DJANGO_DEBUG: True
+      PRODUCTION: "false"
+      DJANGO_DEBUG: "True"
       # List of allowed hosts separated by spaces (e.g.: "localhost domain.xyz 10.0.0.1")
       # If set to "*" all hosts are allowed
       DJANGO_ALLOWED_HOSTS: "*"

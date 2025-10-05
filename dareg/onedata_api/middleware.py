@@ -1,5 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from http.client import responses
+import json
+import logging
 
 import requests
 import oneprovider_client
@@ -13,10 +15,10 @@ from onedata_wrapper.models.filesystem.entry_request import EntryRequest
 from onedata_wrapper.models.filesystem.new_directory_request import NewDirectoryRequest
 from onedata_wrapper.models.share.new_share_request import NewShareRequest
 from onedata_wrapper.selectors.file_attribute import ALL as FA_ALL
-from api.models import Project, Dataset, Facility
+from api.models import Job, JobParams, JobStatus, Project, Dataset, Facility, WorkflowTemplate, WorkflowParams
 import base64
 
-
+logger = logging.getLogger(__name__)
 
 def create_public_share(project: Project, dataset_name: str, dataset_description: str, file_entry: FileEntry):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
@@ -239,11 +241,202 @@ def get_file_metadata(project: Project, file_id: str):
     oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
     error = None
     metadata = None
-
+    logger.info(f"Url: {oneprovider_configuration.host}/data/{file_id}")
+    logger.info(f"Token: {oneprovider_configuration.api_key['X-Auth-Token']}")
     try:
         file_op_api = FileOperationsApi(oneprovider_configuration)
-        metadata = file_op_api.get_file(EntryRequest(file_id), FA_ALL)
+        # metadata = file_op_api.get_file(EntryRequest(file_id), FA_ALL)
     except Exception as e:
         error = {"error": f"Failed to create the dataset. {e}"}
 
     return metadata, error
+
+def verify_job(job: Job):
+    """
+    Verify job runtime requirements (external resources).
+    Note: app_config validation is done in Job.clean() method.
+    """
+    logger.info("Verifying Job runtime requirements...")
+
+    # Get the project from the job using the centralized method
+    project = job.get_project()
+    logger.info(f"Project: {project}")
+
+    # Verify output_resource_object exists and has onedata_file_id
+    if not job.output_resource_object:
+        raise ValueError("Output resource object is required for job execution")
+
+    if not hasattr(job.output_resource_object, 'onedata_file_id'):
+        raise ValueError(f"Output resource {job.output_resource_object.__class__.__name__} does not have onedata_file_id")
+
+    output_file_id = job.output_resource_object.onedata_file_id
+    logger.info(f"Verifying output file existence - needs to be folder: {output_file_id}")
+    metadata, error = get_file_metadata(project, output_file_id)
+    if error:
+        raise ValueError(f"Output file validation failed: {error}")
+    else:
+        logger.info(f"Output file metadata: {metadata}")
+
+    logger.info("Job runtime requirements verified successfully.")
+
+def send_job(job: Job):
+    logger.info("Sending job for processing...")
+
+    # Get the project from the job using the centralized method
+    project = job.get_project()
+    logger.info(f"Creating workflow execution project: {project}")
+    oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    oneprovider_configuration.host = project.facility.onedata_provider_url
+    logger.info(f"Creating workflow execution host: {oneprovider_configuration.host}")
+    oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
+    logger.info(f"Creating workflow execution api key: {oneprovider_configuration.api_key['X-Auth-Token'] }")
+    workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
+
+    # Parse appConfig from workflow template and job, merge with job taking precedence
+    workflow_app_config = json.loads(job.workflow_template.input_params['appConfig'])
+    # job.app_config is now directly the dict (no nested 'appConfig' key)
+    job_app_config = job.app_config
+
+    # Merge appConfigs with job appConfig taking precedence
+    merged_app_config = {**workflow_app_config, **job_app_config}
+
+    # Extract storeId from workflow template appConfig (not from merged)
+    store_id = workflow_app_config['storeId']
+
+    # Remove storeId from merged config as it's used as the store key
+    store_config = {k: v for k, v in merged_app_config.items() if k != 'storeId'}
+
+    body = {
+        "spaceId": f"{project.onedata_space_id}",
+        "atmWorkflowSchemaId": f"{job.workflow_template.onedata_workflow_id}",
+        "atmWorkflowSchemaRevisionNumber": int(job.workflow_template.revision),
+        "storeInitialContentOverlay": {
+            f"{job.workflow_template.input_params['onedataInputStore']}": {
+                "fileId": f"{job.root_resource_object.onedata_space_id if hasattr(job.root_resource_object, 'onedata_space_id') and not hasattr(job.root_resource_object, 'onedata_file_id') else job.root_resource_object.onedata_file_id}"
+            },
+            f"{job.workflow_template.input_params['onedataOutputStore']}": {
+                "fileId": f"{job.output_resource_object.onedata_file_id}"
+            },
+            f"{store_id}": store_config
+        },
+        "logLevel": "debug",
+        "callback": "https://my-server.example.com/execution-callback"
+    }
+
+    logger.info(f"Creating workflow execution with body: {json.dumps(body, indent=2)}")
+
+    # Set job status to assigning before sending to OneData
+    job.set_status(JobStatus.ASSIGNING)
+    logger.info(f"Job status set to ASSIGNING")
+
+    # receipt the respone and get atmWorkflowExecutionId from response schema
+    try:
+        response = workflow_client.schedule_workflow_execution(body)
+        logger.info(f"Workflow execution created successfully.")
+
+        # Set job status to assigned and store execution ID when OneData responds successfully
+        job.onedata_workflow_execution_id = response.atm_workflow_execution_id
+        job.set_status(JobStatus.ASSIGNED)
+        job.unclaim_job()  # Release claim now that job is successfully submitted
+        job.save()
+        logger.info(f"Job status set to ASSIGNED with execution ID: {response.atm_workflow_execution_id}") 
+    except Exception as e:
+        logger.error(f"Failed to create workflow execution: {e}")
+        job.set_status(JobStatus.NEW)
+        job.unclaim_job()  # Release claim now that job is successfully submitted
+        job.save()
+        raise
+
+def get_job_status(job: Job):
+    logger.info(f"Getting status for job with id {job.id}")
+
+    # Get the project from the job using the centralized method
+    project = job.get_project()
+
+    # TODO: this code will be used once we use onedata client for workflow exectuion details
+    # oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    # oneprovider_configuration.host = project.facility.onedata_provider_url
+    # oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
+    # workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
+
+    logger.info(f"Polling workflow execution for job: {job.id}, execution ID: {job.onedata_workflow_execution_id}")
+    # TODO: Use workflow_client.get_workflow_execution_details instead
+    status = fetch_workflow_status_via_http(project, job.onedata_workflow_execution_id)
+    if status:
+        logger.info("Workflow received successfully.")
+        if status == "finished":
+            logger.info(f"Job {job.id} finished successfully.")
+            job.set_status(JobStatus.SUCCESS)
+            # Unclaim job since it reached final state
+            if job.claimed:
+                job.unclaim_job()
+        elif status != "finished" and status != "active":
+            logger.info(f"Job {job.id} finished with failure.")
+            job.set_status(JobStatus.FAILURE)
+            # Unclaim job since it reached final state
+            if job.claimed:
+                job.unclaim_job()
+        elif status == "active":
+            logger.info(f"Job {job.id} is still running.")
+            job.set_status(JobStatus.RUNNING)
+        else:
+            logger.info(f"Job {job.id} has status {status}.")
+    else:
+        logger.error(f"Failed to poll workflow execution: status not available.")
+        # Raise exception to trigger polling failure counter logic
+        raise Exception("Failed to poll workflow execution: status not available")
+
+# TODO: Drop this function once library fix is introduced
+def fetch_workflow_status_via_http(project, onedata_workflow_execution_id):
+    provider_url = project.facility.onedata_provider_url
+    token = project.facility.onedata_token
+    url = f"{provider_url}/automation/execution/workflows/{onedata_workflow_execution_id}"
+    headers = {
+        "X-Auth-Token": token,
+        "Accept": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("status")
+    except Exception as e:
+        logger.error(f"Failed to fetch workflow status via HTTP: {e}")
+        return None
+    
+def verify_workflow_existence(workflow: WorkflowTemplate):
+    """
+    Verify that the workflow with the given ID exists in the Oneprovider.
+    """
+    logger.info(f"Verifying workflow with id {workflow.onedata_workflow_id} exists in onedata")
+
+    # Get any project that supports this workflow template
+    # projects = workflow.supported_projects.all()
+    # if not projects.exists():
+    #     raise ValueError("No projects support this workflow template")
+
+    # project = projects.first()
+
+    # oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    # oneprovider_configuration.host = project.facility.onedata_provider_url
+    # oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
+    # workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
+    
+    try:
+        # TODO: Verify that the workflow with this ID exists
+        logger.info(f"Workflow with id {workflow.onedata_workflow_id} exists.")
+        return True
+    except Exception as e:
+        logger.error(f"Workflow with id {workflow.onedata_workflow_id} does not exist: {e}")
+        return False
+    
+def verify_workflow_template(workflow: WorkflowTemplate):
+    logger.info(f"Verifying inputsTemplate for workflow with id {workflow.onedata_workflow_id} in onedata")
+    assert workflow.input_params is not None, "'inputsTemplate' is missing in schema"
+    try:
+        workflow_params = WorkflowParams.from_dict(workflow.input_params)
+        logger.info(f"InputsTemplate for workflow with id {workflow.onedata_workflow_id} is valid")
+    except Exception as e:
+        raise ValueError(f"Failed to validate workflow input_params: {e}")
+
+    # TODO: Verify that workflow stores exist
