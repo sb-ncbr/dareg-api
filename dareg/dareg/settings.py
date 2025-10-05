@@ -30,6 +30,15 @@ if os.environ["DJANGO_DEBUG"].lower() == "true":
 
 ALLOWED_HOSTS = os.environ["DJANGO_ALLOWED_HOSTS"].split()
 
+
+
+# JobEngine settings
+JOB_ENGINE_SUBMIT_LIMIT = int(os.environ.get("JOB_ENGINE_SUBMIT_LIMIT", 20))
+JOB_ENGINE_POLL_LIMIT = int(os.environ.get("JOB_ENGINE_POLL_LIMIT", 20))
+
+# Job loop interval in seconds for job scheduler
+JOB_LOOP_INTERVAL = int(os.environ.get("JOB_LOOP_INTERVAL", 60))
+
 # Application definition
 
 INSTALLED_APPS = [

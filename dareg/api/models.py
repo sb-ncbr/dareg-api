@@ -1,9 +1,11 @@
 import base64
 import hashlib
+import json
 import os
 import uuid
 import datetime
 from enum import StrEnum
+import logging
 
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
@@ -26,7 +28,7 @@ from django.contrib.contenttypes.models import ContentType
 # pyma graph_models --exclude-models TimeStampedModel,BaseModel,User --pydot --arrow-shape normal --disable-abstract-fields --color-code-deletions -o dareg.png api
 # pyma graph_models api --all-applications --group-models --pydot --arrow-shape normal --color-code-deletions -o dareg_full.png
 ##
-
+logger = logging.getLogger(__name__)
 
 class BaseModel(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -140,7 +142,6 @@ class PermsObject(BaseModel):
     class Meta:
         abstract = True
 
-
 class PermsGroup(Group):
     """
     The group we use to control user permissions to PermsObjects. 
@@ -179,6 +180,7 @@ class PermsGroup(Group):
         class_name = self.content_object._meta.verbose_name.lower()
 
         if self.role == self.OWNER:
+            logger.info(f"Assigning permission: delete_{class_name}, group: {self}, object: {self.content_object}")
             assign_perm(f"delete_{class_name}", self, self.content_object)
         
         if self.role == self.OWNER or self.role == self.EDITOR:
@@ -249,9 +251,10 @@ class Project(PermsObject):
         related_name="default_dataset_schema",
     )
     onedata_space_id = models.CharField("Onedata space ID", max_length=200, blank=True)
+    workflow_templates = models.ManyToManyField('WorkflowTemplate', blank=True, related_name='supported_projects')
 
     trigram_search_fields = ["name", "description"]
-    
+
     class Meta:
         unique_together = ("facility", "name")
 
@@ -408,3 +411,373 @@ class UserProfile(BaseModel):
 
     def __str__(self):
         return f'{self.full_name}'
+
+class WorkflowType(StrEnum):
+    WRITE_DATA = "WriteData"
+    READONLY = "Readonly"
+    IN_PLACE_CHANGE = "In-placeChange"
+    EXPORT = "Export"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
+class WorkflowTemplate(PermsObject):
+    onedata_workflow_id = models.CharField("Onedata Workflow ID", max_length=200, unique=False)
+    name = models.CharField("Name", max_length=200, blank=True)
+    description = models.CharField("Description", max_length=500, blank=True)
+    revision = models.DecimalField("Revision", max_digits=10, decimal_places=0, default=1)
+    input_params = models.JSONField("JSON", default=dict, blank=True)
+    workflow_type = models.CharField("Workflow Type", max_length=20, choices=WorkflowType.choices(), default=WorkflowType.READONLY)
+
+    class Meta:
+        verbose_name = "workflowtemplate"
+        verbose_name_plural = "workflowtemplates"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+
+        # Validate input_params structure if provided
+        if self.input_params:
+            try:
+                # This will validate the structure including appConfigDetails if present
+                WorkflowParams.from_dict(self.input_params)
+            except ValueError as e:
+                raise ValidationError({
+                    'input_params': f"Invalid workflow parameters: {str(e)}"
+                })
+
+class JobStatus(StrEnum):
+    NEW = "new"
+    # TODO: detect jobs in assigning state and find out how to verify it is not already running
+    ASSIGNING = "assigning"
+    ASSIGNED = "assigned"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILURE = "failure"
+    SUBMISSION_ERROR = "submissionError"
+    POLLING_ERROR = "pollingError"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+    
+class JobLogLevel(StrEnum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
+class Job(PermsObject):
+    workflow_template = models.ForeignKey(WorkflowTemplate, models.PROTECT)
+    # Generic relation to Project, Dataset, or Experiment for input
+    root_resource_content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="Content type of the related object (Project, Dataset, or Experiment)",
+        null=True,
+        blank=True,
+        related_name='job_root_resource',
+    )
+    root_resource_id = models.UUIDField(
+        help_text="ID of the related object (Project, Dataset, or Experiment)",
+        null=True,
+        blank=True,
+    )
+    root_resource_object = GenericForeignKey('root_resource_content_type', 'root_resource_id')
+    # Generic relation to Dataset or Experiment for output
+    output_resource_content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="Content type of the related object (Dataset or Experiment)",
+        null=True,
+        blank=True,
+        related_name='job_output_resource',
+    )
+    output_resource_id = models.UUIDField(
+        help_text="ID of the related object (Dataset or Experiment)",
+        null=True,
+        blank=True,
+    )
+    output_resource_object = GenericForeignKey('output_resource_content_type', 'output_resource_id')
+    onedata_workflow_execution_id = models.CharField("Onedata Workflow Execution ID", max_length=200, blank=True, null=True, editable=False)
+    name = models.CharField("Name", max_length=200)
+    description = models.CharField("Description", max_length=500, blank=True)
+    status = models.CharField(choices=JobStatus.choices(), default=JobStatus.NEW, max_length=20, editable=False)
+    app_config = models.JSONField("App config json", default=dict)
+    start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True, editable=False)
+    end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True, editable=False)
+    log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20, blank=True)
+    job_submission_counter = models.IntegerField("Job Submission Counter", default=0, help_text="Number of times job submission has been attempted")
+    job_polling_counter = models.IntegerField("Job Polling Counter", default=0, help_text="Number of times job status polling has failed")
+    claimed = models.BooleanField("Job Claimed", default=False, help_text="Whether this job is currently claimed by a worker for processing")
+    claimed_at = models.DateTimeField("Claimed At", null=True, blank=True, help_text="Timestamp when the job was claimed")
+
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        # Enforce that root_resource_content_type is only Experiment, Dataset, or Project
+        if self.root_resource_content_type:
+            allowed_root_models = {"experiment", "dataset", "project"}
+            root_model_name = self.root_resource_content_type.model
+            if root_model_name not in allowed_root_models:
+                raise ValidationError({
+                    "root_resource_content_type": f"Job can only be related to Experiment, Dataset, or Project, not '{root_model_name}'."
+                })
+
+        # Enforce that output_resource_content_type is only Experiment or Dataset
+        if self.output_resource_content_type:
+            allowed_output_models = {"experiment", "dataset"}
+            output_model_name = self.output_resource_content_type.model
+            if output_model_name not in allowed_output_models:
+                raise ValidationError({
+                    "output_resource_content_type": f"Job output can only be related to Experiment or Dataset, not '{output_model_name}'."
+                })
+
+        # Validate app_config against workflow template appConfigDetails
+        if self.workflow_template and self.app_config:
+            # Check if workflow template has appConfigDetails
+            if not self.workflow_template.input_params or 'appConfigDetails' not in self.workflow_template.input_params:
+                raise ValidationError({
+                    "workflow_template": "Workflow template must have appConfigDetails in input_params"
+                })
+
+            app_config_details = self.workflow_template.input_params.get('appConfigDetails', {})
+
+            # app_config is now directly the JSON object (no nested appConfig field)
+            if not isinstance(self.app_config, dict):
+                raise ValidationError({
+                    "app_config": "app_config must be a JSON object"
+                })
+
+            job_app_config = self.app_config
+
+            # Validate each field in job appConfig against appConfigDetails
+            for field_name, field_value in job_app_config.items():
+                # Check if field is defined in appConfigDetails
+                if field_name not in app_config_details:
+                    raise ValidationError({
+                        "app_config": f"Field '{field_name}' is not defined in workflow template appConfigDetails"
+                    })
+
+                # Validate the value type
+                expected_type = app_config_details[field_name]['type']
+                try:
+                    validate_app_config_value(field_value, expected_type, field_name)
+                except ValueError as e:
+                    raise ValidationError({
+                        "app_config": str(e)
+                    })
+
+            # Ensure all required fields from appConfigDetails are present in job appConfig
+            for field_name in app_config_details.keys():
+                if field_name not in job_app_config:
+                    raise ValidationError({
+                        "app_config": f"Required field '{field_name}' is missing in job appConfig"
+                    })
+    
+    def set_status(self, new_status):
+        """
+        Change the status of the job to a new valid state.
+        Args:
+            new_status (str): The new status to set. Must be a valid JobStatus value.
+            save (bool): Whether to save the model after changing status. Default True.
+        Raises:
+            ValueError: If new_status is not a valid JobStatus value.
+        """
+        valid_statuses = {status.value for status in JobStatus}
+        if new_status not in valid_statuses:
+            raise ValueError(f"Invalid job status: {new_status}. Must be one of: {valid_statuses}")
+        
+        if self.status == new_status:
+            logger.info(f"Job {self.id} status is already {new_status}. No change needed.")
+            return
+        if self.status == JobStatus.NEW and new_status == JobStatus.ASSIGNING:
+            self.status = new_status
+        elif self.status == JobStatus.ASSIGNING and new_status == JobStatus.ASSIGNED:
+            self.status = new_status
+        elif self.status == JobStatus.ASSIGNING and new_status == JobStatus.NEW:
+            # Allow transition back to NEW for recovery purposes (stuck jobs without execution ID)
+            self.status = new_status
+        elif self.status == JobStatus.ASSIGNED and new_status == JobStatus.RUNNING:
+            self.status = new_status
+        elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
+            self.status = new_status
+        elif new_status == JobStatus.SUBMISSION_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING]:
+            # Allow transition to SUBMISSION_ERROR from NEW/ASSIGNING states for submission failures
+            self.status = new_status
+        elif new_status == JobStatus.POLLING_ERROR and self.status in [JobStatus.ASSIGNED, JobStatus.RUNNING]:
+            # Allow transition to POLLING_ERROR from ASSIGNED/RUNNING states for polling failures
+            self.status = new_status
+        else:
+            raise ValueError(f"Cannot change job status from {self.status} to {new_status}. Invalid transition.")
+        
+        self.save(update_fields=["status"])
+
+    def claim_job(self):
+        """
+        Atomically claim this job for processing.
+
+        Returns:
+            bool: True if the job was successfully claimed, False if already claimed
+        """
+        from django.utils import timezone
+        from django.db import transaction
+
+        with transaction.atomic():
+            # Use select_for_update to ensure atomicity
+            job = Job.objects.select_for_update().get(pk=self.pk)
+
+            if job.claimed:
+                return False  # Job already claimed
+
+            job.claimed = True
+            job.claimed_at = timezone.now()
+            job.save(update_fields=['claimed', 'claimed_at'])
+
+            # Update the current instance
+            self.claimed = job.claimed
+            self.claimed_at = job.claimed_at
+
+            return True
+
+    def unclaim_job(self):
+        """
+        Release the claim on this job.
+        """
+        self.claimed = False
+        self.claimed_at = None
+        self.save(update_fields=['claimed', 'claimed_at'])
+
+    def get_project(self):
+        """
+        Get the project associated with this job by resolving the root resource chain.
+
+        Returns:
+            Project: The project associated with this job's root resource
+
+        Raises:
+            ValueError: If the root resource type is not supported or if resolution fails
+        """
+        # Get the root resource object
+        root_resource = self.root_resource_content_type.get_object_for_this_type(pk=self.root_resource_id)
+
+        # Determine the project based on the resource type
+        if root_resource.__class__.__name__ == 'Project':
+            # Direct project reference
+            return root_resource
+        elif root_resource.__class__.__name__ == 'Dataset':
+            # Dataset - get project directly
+            return root_resource.project
+        elif root_resource.__class__.__name__ == 'Experiment':
+            # Experiment - get project via dataset
+            return root_resource.dataset.project
+        else:
+            raise ValueError(f"Unsupported root resource type: {root_resource.__class__.__name__}. Expected Project, Dataset, or Experiment.")
+
+class JobParams:
+    def __init__(self, app_config: dict):
+        if not app_config or not isinstance(app_config, dict):
+            raise ValueError("app_config must be a non-empty dictionary")
+        self.app_config = app_config
+
+    @classmethod
+    def from_dict(cls, data):
+        # data is now the app_config dict directly
+        return cls(app_config=data)
+
+def validate_app_config_value(value, expected_type: str, field_name: str):
+    """
+    Validate that a value matches the expected type.
+
+    Args:
+        value: The value to validate
+        expected_type: One of 'string', 'integer', 'float'
+        field_name: Name of the field (for error messages)
+
+    Raises:
+        ValueError: If the value doesn't match the expected type
+    """
+    if expected_type == 'string':
+        if not isinstance(value, str):
+            raise ValueError(f"Field '{field_name}' must be a string, got {type(value).__name__}")
+    elif expected_type == 'integer':
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError(f"Field '{field_name}' must be an integer, got {type(value).__name__}")
+    elif expected_type == 'float':
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"Field '{field_name}' must be a number (float or integer), got {type(value).__name__}")
+    else:
+        raise ValueError(f"Unsupported type '{expected_type}' for field '{field_name}'")
+
+class WorkflowParams:
+    SUPPORTED_TYPES = ['string', 'integer', 'float']
+
+    def __init__(self, onedataInputStore: str, onedataOutputStore: str, appConfig: str, appConfigDetails: dict):
+        if not onedataInputStore or not isinstance(onedataInputStore, str) or not onedataInputStore.strip():
+            raise ValueError("onedataInputStore must be a non-empty string")
+        if not onedataOutputStore or not isinstance(onedataOutputStore, str) or not onedataOutputStore.strip():
+            raise ValueError("onedataOutputStore must be a non-empty string")
+        if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
+            raise ValueError("appConfig must be a non-empty string")
+
+        # Validate that appConfig is valid JSON and contains storeId
+        try:
+            app_config_data = json.loads(appConfig)
+            if 'storeId' not in app_config_data:
+                raise ValueError("appConfig must contain a 'storeId' field")
+        except json.JSONDecodeError:
+            raise ValueError("appConfig must be valid JSON")
+
+        # Validate appConfigDetails - it is now required
+        if appConfigDetails is None:
+            raise ValueError("appConfigDetails is required")
+
+        if not isinstance(appConfigDetails, dict):
+            raise ValueError("appConfigDetails must be a dictionary")
+
+        # Validate structure of appConfigDetails
+        for field_name, field_spec in appConfigDetails.items():
+            if not isinstance(field_spec, dict):
+                raise ValueError(f"appConfigDetails['{field_name}'] must be a dictionary")
+
+            if 'type' not in field_spec:
+                raise ValueError(f"appConfigDetails['{field_name}'] must contain 'type' field")
+
+            if 'description' not in field_spec:
+                raise ValueError(f"appConfigDetails['{field_name}'] must contain 'description' field")
+
+            if field_spec['type'] not in self.SUPPORTED_TYPES:
+                raise ValueError(f"appConfigDetails['{field_name}']['type'] must be one of {self.SUPPORTED_TYPES}, got '{field_spec['type']}'")
+
+            if not isinstance(field_spec['description'], str) or not field_spec['description'].strip():
+                raise ValueError(f"appConfigDetails['{field_name}']['description'] must be a non-empty string")
+
+        # Verify that all appConfig fields (except storeId) are defined in appConfigDetails
+        for field_name in app_config_data.keys():
+            if field_name != 'storeId' and field_name not in appConfigDetails:
+                raise ValueError(f"appConfig field '{field_name}' is not defined in appConfigDetails")
+
+        # Verify that all appConfigDetails fields exist in appConfig
+        for field_name in appConfigDetails.keys():
+            if field_name not in app_config_data:
+                raise ValueError(f"appConfigDetails field '{field_name}' does not exist in appConfig")
+
+        self.onedataInputStore = onedataInputStore
+        self.onedataOutputStore = onedataOutputStore
+        self.appConfig = appConfig
+        self.appConfigDetails = appConfigDetails
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            onedataInputStore=data.get('onedataInputStore'),
+            onedataOutputStore=data.get('onedataOutputStore'),
+            appConfig=data.get('appConfig'),
+            appConfigDetails=data.get('appConfigDetails')
+        )

@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from importlib.metadata import metadata
+import logging
 
 import oneprovider_client
 import requests
@@ -14,9 +15,9 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
-
-from ..models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment
-from ..serializers import (
+from api.models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
+from api.serializers import (
+    JobSerializer,
     UserSerializer,
     GroupSerializer,
     FacilitySerializer,
@@ -26,7 +27,8 @@ from ..serializers import (
     ProfileSerializer,
     ReservationSerializer,
     InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer,
-    ProjectResponseSerializer
+    ProjectResponseSerializer,
+    WorkflowTemplateSerializer
 )
 from ..permissions import NestedPerms, update_perms, SameUser
 from rest_framework.exceptions import PermissionDenied
@@ -38,8 +40,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
-    create_new_experiment, create_new_temp_token, get_file_metadata
+    create_new_experiment, create_new_temp_token, get_file_metadata, verify_job, verify_workflow_template, verify_workflow_existence
 
+logger = logging.getLogger(__name__)
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
@@ -469,3 +472,50 @@ class TempTokenAPIView(APIView):
         if serializer.is_valid():
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WorkflowTemplateViewSet(viewsets.ModelViewSet):
+    queryset = WorkflowTemplate.objects.all()
+    serializer_class = WorkflowTemplateSerializer
+    permission_classes = [NestedPerms, IsAuthenticated]
+
+    # Override the create method to set the created_by field
+    def perform_create(self, serializer):
+        logger.info("Creating a new workflow template viewset")
+        WorkflowTemplate.clean()
+        # Check permissions for the workflow template creation
+        serializer.save(created_by=self.request.user)
+
+    # Override the update method to validate workflow parameters
+    def perform_update(self, serializer):
+        logger.info("Updating workflow template in API viewset")
+        # Save the instance first to get the updated WorkflowTemplate object
+        instance = serializer.save(modified_by=self.request.user)
+        logger.info(f"Validating updated workflow template with id {instance.id}")
+        # Validate workflow parameters (same as admin does)
+        verify_workflow_template(instance)
+        verify_workflow_existence(instance)
+        logger.info(f"Workflow template {instance.id} updated and validated successfully")
+
+
+class JobViewSet(viewsets.ModelViewSet):
+    from rest_framework.exceptions import MethodNotAllowed
+
+    def update(self, request, *args, **kwargs):
+        raise self.MethodNotAllowed('PUT', detail="Job instances are not updateable.")
+
+    def partial_update(self, request, *args, **kwargs):
+        raise self.MethodNotAllowed('PATCH', detail="Job instances are not updateable.")
+    
+    queryset = Job.objects.all()
+    serializer_class = JobSerializer
+    permission_classes = [NestedPerms, IsAuthenticated]
+
+    # Override the create method to set the created_by field
+    def perform_create(self, serializer):
+        logger.info("Creating a job viewset")
+
+        # Validation happens in serializer.validate() before this point
+        job_instance = serializer.save(created_by=self.request.user, modified_by=self.request.user)
+        logger.info(f"Saved job with id {job_instance.id}")
+
