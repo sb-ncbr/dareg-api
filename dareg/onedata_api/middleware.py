@@ -343,6 +343,9 @@ def send_job(job: Job):
         logger.info(f"Job status set to ASSIGNED with execution ID: {response.atm_workflow_execution_id}") 
     except Exception as e:
         logger.error(f"Failed to create workflow execution: {e}")
+        job.set_status(JobStatus.NEW)
+        job.unclaim_job()  # Release claim now that job is successfully submitted
+        job.save()
         raise
 
 def get_job_status(job: Job):
