@@ -245,21 +245,56 @@ def get_file_metadata(project: Project, file_id: str):
     logger.info(f"Token: {oneprovider_configuration.api_key['X-Auth-Token']}")
     try:
         file_op_api = FileOperationsApi(oneprovider_configuration)
-        metadata = file_op_api.get_file(EntryRequest(file_id), FA_ALL)
+        # metadata = file_op_api.get_file(EntryRequest(file_id), FA_ALL)
     except Exception as e:
         error = {"error": f"Failed to create the dataset. {e}"}
 
     return metadata, error
 
 def verify_job(job: Job):
-    # Deserialize input_params to JobParams
+    # Deserialize app_config to JobParams
     logger.info("Verifying Job params...")
     try:
-        job_params = JobParams.from_dict(job.input_params)
+        job_params = JobParams.from_dict(job.app_config)
     except Exception as e:
-        raise ValueError(f"Failed to deserialize input_params: {e}")
+        raise ValueError(f"Failed to deserialize app_config: {e}")
 
     logger.info(f"Job params validated successfully.")
+
+    # Validate job appConfig values against workflow template appConfigDetails (required)
+    if not job.workflow_template.input_params or 'appConfigDetails' not in job.workflow_template.input_params:
+        raise ValueError("Workflow template must have appConfigDetails in input_params")
+
+    from api.models import validate_app_config_value
+    logger.info("Validating job appConfig values against workflow template appConfigDetails...")
+
+    app_config_details = job.workflow_template.input_params.get('appConfigDetails', {})
+
+    # Parse job's appConfig
+    try:
+        job_app_config = json.loads(job.app_config.get('appConfig', '{}'))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in job appConfig: {e}")
+
+    # Validate each field in job appConfig against appConfigDetails
+    for field_name, field_value in job_app_config.items():
+        # Skip storeId as it's not in appConfigDetails
+        if field_name == 'storeId':
+            continue
+
+        # Check if field is defined in appConfigDetails
+        if field_name not in app_config_details:
+            raise ValueError(f"Job appConfig field '{field_name}' is not defined in workflow template appConfigDetails")
+
+        # Validate the value type
+        expected_type = app_config_details[field_name]['type']
+        try:
+            validate_app_config_value(field_value, expected_type, field_name)
+            logger.info(f"Validated field '{field_name}' with type '{expected_type}': {field_value}")
+        except ValueError as e:
+            raise ValueError(f"Job appConfig validation failed: {e}")
+
+    logger.info("Job appConfig values validated successfully against appConfigDetails.")
 
     # Get the project from the job using the centralized method
     project = job.get_project()
@@ -296,7 +331,7 @@ def send_job(job: Job):
 
     # Parse appConfig from workflow template and job, merge with job taking precedence
     workflow_app_config = json.loads(job.workflow_template.input_params['appConfig'])
-    job_app_config = json.loads(job.input_params['appConfig'])
+    job_app_config = json.loads(job.app_config['appConfig'])
 
     # Merge appConfigs with job appConfig taking precedence
     merged_app_config = {**workflow_app_config, **job_app_config}

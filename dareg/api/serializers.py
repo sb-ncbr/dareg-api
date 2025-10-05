@@ -239,6 +239,12 @@ class WorkflowTemplateSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["id", "created_by", "modified_by"]
 
+    def validate(self, attrs):
+        # Create a temporary instance to trigger model validation
+        instance = WorkflowTemplate(**attrs)
+        instance.clean()
+        return attrs
+
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
 
@@ -252,9 +258,15 @@ class JobSerializer(serializers.ModelSerializer):
             'workflow_template', 'root_resource_content_type', 'root_resource_id',
             'output_resource_content_type', 'output_resource_id',
             'name', 'description', 'status',
-            'input_params', 'start_time', 'end_time', 'log_level'
+            'app_config', 'start_time', 'end_time', 'log_level'
         ]
         read_only_fields = ["id", "created_by", "modified_by"]
+
+    def validate(self, attrs):
+        # Create a temporary instance to trigger model validation
+        instance = Job(**attrs)
+        instance.clean()
+        return attrs
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user

@@ -511,14 +511,11 @@ class JobViewSet(viewsets.ModelViewSet):
     serializer_class = JobSerializer
     permission_classes = [NestedPerms, IsAuthenticated]
 
-    # Override the create method to set the created_by field and perform validation
+    # Override the create method to set the created_by field
     def perform_create(self, serializer):
         logger.info("Creating a job viewset")
 
-        # Save the job first to create the actual Job instance
+        # Validation happens in serializer.validate() before this point
         job_instance = serializer.save(created_by=self.request.user, modified_by=self.request.user)
         logger.info(f"Saved job with id {job_instance.id}")
-
-        # Now verify the job with the actual Job instance
-        verify_job(job_instance)
 

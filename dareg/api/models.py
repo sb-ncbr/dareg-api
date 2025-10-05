@@ -423,7 +423,7 @@ class WorkflowType(StrEnum):
         return [(key.value, key.name) for key in cls]
 
 class WorkflowTemplate(PermsObject):
-    onedata_workflow_id = models.CharField("Onedata Workflow ID", max_length=200, unique=True)
+    onedata_workflow_id = models.CharField("Onedata Workflow ID", max_length=200, unique=False)
     name = models.CharField("Name", max_length=200, blank=True)
     description = models.CharField("Description", max_length=500, blank=True)
     revision = models.DecimalField("Revision", max_digits=10, decimal_places=0, default=1)
@@ -433,6 +433,20 @@ class WorkflowTemplate(PermsObject):
     class Meta:
         verbose_name = "workflowtemplate"
         verbose_name_plural = "workflowtemplates"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+
+        # Validate input_params structure if provided
+        if self.input_params:
+            try:
+                # This will validate the structure including appConfigDetails if present
+                WorkflowParams.from_dict(self.input_params)
+            except ValueError as e:
+                raise ValidationError({
+                    'input_params': f"Invalid workflow parameters: {str(e)}"
+                })
 
 class JobStatus(StrEnum):
     NEW = "new"
@@ -494,7 +508,7 @@ class Job(PermsObject):
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500, blank=True)
     status = models.CharField(choices=JobStatus.choices(), default=JobStatus.NEW, max_length=20, editable=False)
-    input_params = models.JSONField("JSON", default=dict)
+    app_config = models.JSONField("App config json", default=dict)
     start_time = models.DateTimeField("Start Time", max_length=200, null=True, blank=True, editable=False)
     end_time = models.DateTimeField("End Time", max_length=200, null=True, blank=True, editable=False)
     log_level = models.CharField(choices=JobLogLevel.choices(), default=JobLogLevel.INFO, max_length=20, blank=True)
@@ -524,6 +538,52 @@ class Job(PermsObject):
                 raise ValidationError({
                     "output_resource_content_type": f"Job output can only be related to Experiment or Dataset, not '{output_model_name}'."
                 })
+
+        # Validate app_config against workflow template appConfigDetails
+        if self.workflow_template and self.app_config:
+            # Check if workflow template has appConfigDetails
+            if not self.workflow_template.input_params or 'appConfigDetails' not in self.workflow_template.input_params:
+                raise ValidationError({
+                    "workflow_template": "Workflow template must have appConfigDetails in input_params"
+                })
+
+            app_config_details = self.workflow_template.input_params.get('appConfigDetails', {})
+
+            # Parse job's appConfig
+            try:
+                job_app_config = json.loads(self.app_config.get('appConfig', '{}'))
+            except json.JSONDecodeError as e:
+                raise ValidationError({
+                    "app_config": f"Invalid JSON in appConfig field: {e}"
+                })
+
+            # Validate each field in job appConfig against appConfigDetails
+            for field_name, field_value in job_app_config.items():
+                # Skip storeId as it's not in appConfigDetails
+                if field_name == 'storeId':
+                    continue
+
+                # Check if field is defined in appConfigDetails
+                if field_name not in app_config_details:
+                    raise ValidationError({
+                        "app_config": f"Field '{field_name}' is not defined in workflow template appConfigDetails"
+                    })
+
+                # Validate the value type
+                expected_type = app_config_details[field_name]['type']
+                try:
+                    validate_app_config_value(field_value, expected_type, field_name)
+                except ValueError as e:
+                    raise ValidationError({
+                        "app_config": str(e)
+                    })
+
+            # Ensure all required fields from appConfigDetails are present in job appConfig
+            for field_name in app_config_details.keys():
+                if field_name not in job_app_config:
+                    raise ValidationError({
+                        "app_config": f"Required field '{field_name}' is missing in job appConfig"
+                    })
     
     def set_status(self, new_status):
         """
@@ -636,8 +696,34 @@ class JobParams:
             appConfig=data.get('appConfig')
         )
 
+def validate_app_config_value(value, expected_type: str, field_name: str):
+    """
+    Validate that a value matches the expected type.
+
+    Args:
+        value: The value to validate
+        expected_type: One of 'string', 'integer', 'float'
+        field_name: Name of the field (for error messages)
+
+    Raises:
+        ValueError: If the value doesn't match the expected type
+    """
+    if expected_type == 'string':
+        if not isinstance(value, str):
+            raise ValueError(f"Field '{field_name}' must be a string, got {type(value).__name__}")
+    elif expected_type == 'integer':
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError(f"Field '{field_name}' must be an integer, got {type(value).__name__}")
+    elif expected_type == 'float':
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"Field '{field_name}' must be a number (float or integer), got {type(value).__name__}")
+    else:
+        raise ValueError(f"Unsupported type '{expected_type}' for field '{field_name}'")
+
 class WorkflowParams:
-    def __init__(self, onedataInputStore: str, onedataOutputStore: str, appConfig: str):
+    SUPPORTED_TYPES = ['string', 'integer', 'float']
+
+    def __init__(self, onedataInputStore: str, onedataOutputStore: str, appConfig: str, appConfigDetails: dict):
         if not onedataInputStore or not isinstance(onedataInputStore, str) or not onedataInputStore.strip():
             raise ValueError("onedataInputStore must be a non-empty string")
         if not onedataOutputStore or not isinstance(onedataOutputStore, str) or not onedataOutputStore.strip():
@@ -652,14 +738,51 @@ class WorkflowParams:
                 raise ValueError("appConfig must contain a 'storeId' field")
         except json.JSONDecodeError:
             raise ValueError("appConfig must be valid JSON")
+
+        # Validate appConfigDetails - it is now required
+        if appConfigDetails is None:
+            raise ValueError("appConfigDetails is required")
+
+        if not isinstance(appConfigDetails, dict):
+            raise ValueError("appConfigDetails must be a dictionary")
+
+        # Validate structure of appConfigDetails
+        for field_name, field_spec in appConfigDetails.items():
+            if not isinstance(field_spec, dict):
+                raise ValueError(f"appConfigDetails['{field_name}'] must be a dictionary")
+
+            if 'type' not in field_spec:
+                raise ValueError(f"appConfigDetails['{field_name}'] must contain 'type' field")
+
+            if 'description' not in field_spec:
+                raise ValueError(f"appConfigDetails['{field_name}'] must contain 'description' field")
+
+            if field_spec['type'] not in self.SUPPORTED_TYPES:
+                raise ValueError(f"appConfigDetails['{field_name}']['type'] must be one of {self.SUPPORTED_TYPES}, got '{field_spec['type']}'")
+
+            if not isinstance(field_spec['description'], str) or not field_spec['description'].strip():
+                raise ValueError(f"appConfigDetails['{field_name}']['description'] must be a non-empty string")
+
+        # Verify that all appConfig fields (except storeId) are defined in appConfigDetails
+        for field_name in app_config_data.keys():
+            if field_name != 'storeId' and field_name not in appConfigDetails:
+                raise ValueError(f"appConfig field '{field_name}' is not defined in appConfigDetails")
+
+        # Verify that all appConfigDetails fields exist in appConfig
+        for field_name in appConfigDetails.keys():
+            if field_name not in app_config_data:
+                raise ValueError(f"appConfigDetails field '{field_name}' does not exist in appConfig")
+
         self.onedataInputStore = onedataInputStore
         self.onedataOutputStore = onedataOutputStore
         self.appConfig = appConfig
+        self.appConfigDetails = appConfigDetails
 
     @classmethod
     def from_dict(cls, data):
         return cls(
             onedataInputStore=data.get('onedataInputStore'),
             onedataOutputStore=data.get('onedataOutputStore'),
-            appConfig=data.get('appConfig')
+            appConfig=data.get('appConfig'),
+            appConfigDetails=data.get('appConfigDetails')
         )
