@@ -263,9 +263,18 @@ class JobSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_by", "modified_by"]
 
     def validate(self, attrs):
+        from onedata_api.middleware import verify_job
+
         # Create a temporary instance to trigger model validation
         instance = Job(**attrs)
         instance.clean()
+
+        # Verify job runtime requirements before saving
+        try:
+            verify_job(instance)
+        except ValueError as e:
+            raise serializers.ValidationError({"app_config": str(e)})
+
         return attrs
 
     def create(self, validated_data):

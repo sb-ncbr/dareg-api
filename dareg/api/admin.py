@@ -321,10 +321,16 @@ class JobAdmin(BaseModelAdmin):
         if change:
             from django.core.exceptions import PermissionDenied
             raise self.MethodNotAllowed("Job instances are not updateable.")
-        logger.info("Verifying job in admin save_model")
+
+        logger.info("Validating job in admin save_model")
+        # Explicitly call clean() to validate app_config
+        obj.clean()
+
+        logger.info("Verifying job runtime requirements in admin save_model")
+        # Verify runtime requirements (external resources)
         verify_job(obj)
+
         logger.info(f"Saving job with id {obj.id if obj.id else 'new'}")
-        
         obj.created_by = request.user
         obj.modified_by = request.user
         obj.save()

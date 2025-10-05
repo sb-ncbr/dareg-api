@@ -549,20 +549,16 @@ class Job(PermsObject):
 
             app_config_details = self.workflow_template.input_params.get('appConfigDetails', {})
 
-            # Parse job's appConfig
-            try:
-                job_app_config = json.loads(self.app_config.get('appConfig', '{}'))
-            except json.JSONDecodeError as e:
+            # app_config is now directly the JSON object (no nested appConfig field)
+            if not isinstance(self.app_config, dict):
                 raise ValidationError({
-                    "app_config": f"Invalid JSON in appConfig field: {e}"
+                    "app_config": "app_config must be a JSON object"
                 })
+
+            job_app_config = self.app_config
 
             # Validate each field in job appConfig against appConfigDetails
             for field_name, field_value in job_app_config.items():
-                # Skip storeId as it's not in appConfigDetails
-                if field_name == 'storeId':
-                    continue
-
                 # Check if field is defined in appConfigDetails
                 if field_name not in app_config_details:
                     raise ValidationError({
@@ -685,16 +681,15 @@ class Job(PermsObject):
             raise ValueError(f"Unsupported root resource type: {root_resource.__class__.__name__}. Expected Project, Dataset, or Experiment.")
 
 class JobParams:
-    def __init__(self, appConfig: str):
-        if not appConfig or not isinstance(appConfig, str) or not appConfig.strip():
-            raise ValueError("appConfig must be a non-empty string")
-        self.appConfig = appConfig
+    def __init__(self, app_config: dict):
+        if not app_config or not isinstance(app_config, dict):
+            raise ValueError("app_config must be a non-empty dictionary")
+        self.app_config = app_config
 
     @classmethod
     def from_dict(cls, data):
-        return cls(
-            appConfig=data.get('appConfig')
-        )
+        # data is now the app_config dict directly
+        return cls(app_config=data)
 
 def validate_app_config_value(value, expected_type: str, field_name: str):
     """
