@@ -10,11 +10,11 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
 1. Setup a project for you in openstack to have enough quota for creating virtual machines - 4 machines(2 for kubernetes CP and 2 for workers) should be enough.
 2. Utilize the Open OnDemand internal tool https://ondemand-dev.metacentrum.cz/pun/sys/dashboard to deploy kubernetes do previously created project
     - open interactive apps tab and option Kubernetes infra example OS 
-        - <img src="kubernetesInfraExampleOs.png" alt="alt text" width="400" height="400"/>
+        - <img src="./docs/images/kubernetesInfraExampleOs.png" alt="alt text" width="400" height="400"/>
     - select a project to use(from step 1), put your ssh public key and number of nodes for CP and DP
     - click launch
     - after few minutes(30), an interactive session is created for you and the nodes(CP, DP and Bastion) are provisioned
-        - <img src="kubernetesInfraExampleOSSession.png" alt="alt text" width="400" height="400"/>
+        - <img src="./docs/images/kubernetesInfraExampleOSSession.png" alt="alt text" width="400" height="400"/>
 3. Assign a public IP to the Bastion server(for deploying onedata openfaas via helm charts) and for workers(for onedata provider to have access to openfaas). Please note all VM's live within same network.
 4. Configure network security rules for the nodes to make communication between them possible and between onedata provider and openfaas running inside kubernetes
     - CP -> Network security group with following rules
@@ -245,7 +245,7 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
     ]```
 16. Restart one provider to reload the config.
 17. If everything goes well, your oneprovider should enable button run workflow on a file as depicted in the picture.
-    - <img src="workflowButton.png" alt="alt text" width="1200" height="400"/>
+    - <img src="./docs/images/workflowButton.png" alt="alt text" width="1200" height="400"/>
 18. You should see openfaas namespaces deployed to kubernetes cluster with some running pods.
 
 ### Run your first workflow manually via onedata UI
@@ -258,7 +258,5 @@ Let's setup cluster where the workflow and openfaas will be running. In our case
     - TODO: edit secret Mutatingwebhookconfigurations by deleting last 4 characters - 'Cg=='
     - TODO: configure /etc/hosts
 6. Now all your workflows should run properly
-
-## TODO: Run your workflow utilizing OneData
 
 
