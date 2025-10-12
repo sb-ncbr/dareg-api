@@ -262,20 +262,18 @@ def verify_job(job: Job):
     project = job.get_project()
     logger.info(f"Project: {project}")
 
-    # Verify output_resource_object exists and has onedata_file_id
-    if not job.output_resource_object:
-        raise ValueError("Output resource object is required for job execution")
+    # Verify output_resource_object only if it's provided
+    if job.output_resource_object:
+        if not hasattr(job.output_resource_object, 'onedata_file_id'):
+            raise ValueError(f"Output resource {job.output_resource_object.__class__.__name__} does not have onedata_file_id")
 
-    if not hasattr(job.output_resource_object, 'onedata_file_id'):
-        raise ValueError(f"Output resource {job.output_resource_object.__class__.__name__} does not have onedata_file_id")
-
-    output_file_id = job.output_resource_object.onedata_file_id
-    logger.info(f"Verifying output file existence - needs to be folder: {output_file_id}")
-    metadata, error = get_file_metadata(project, output_file_id)
-    if error:
-        raise ValueError(f"Output file validation failed: {error}")
-    else:
-        logger.info(f"Output file metadata: {metadata}")
+        output_file_id = job.output_resource_object.onedata_file_id
+        logger.info(f"Verifying output file existence - needs to be folder: {output_file_id}")
+        metadata, error = get_file_metadata(project, output_file_id)
+        if error:
+            raise ValueError(f"Output file validation failed: {error}")
+        else:
+            logger.info(f"Output file metadata: {metadata}")
 
     logger.info("Job runtime requirements verified successfully.")
 
@@ -306,16 +304,22 @@ def send_job(job: Job):
     # Remove storeId from merged config as it's used as the store key
     store_config = {k: v for k, v in merged_app_config.items() if k != 'storeId'}
 
+    # Determine input file ID
+    input_file_id = job.root_resource_object.onedata_space_id if hasattr(job.root_resource_object, 'onedata_space_id') and not hasattr(job.root_resource_object, 'onedata_file_id') else job.root_resource_object.onedata_file_id
+
+    # Determine output file ID - use output resource if provided, otherwise use input file ID
+    output_file_id = job.output_resource_object.onedata_file_id if job.output_resource_object else input_file_id
+
     body = {
         "spaceId": f"{project.onedata_space_id}",
         "atmWorkflowSchemaId": f"{job.workflow_template.onedata_workflow_id}",
         "atmWorkflowSchemaRevisionNumber": int(job.workflow_template.revision),
         "storeInitialContentOverlay": {
             f"{job.workflow_template.input_params['onedataInputStore']}": {
-                "fileId": f"{job.root_resource_object.onedata_space_id if hasattr(job.root_resource_object, 'onedata_space_id') and not hasattr(job.root_resource_object, 'onedata_file_id') else job.root_resource_object.onedata_file_id}"
+                "fileId": f"{input_file_id}"
             },
             f"{job.workflow_template.input_params['onedataOutputStore']}": {
-                "fileId": f"{job.output_resource_object.onedata_file_id}"
+                "fileId": f"{output_file_id}"
             },
             f"{store_id}": store_config
         },

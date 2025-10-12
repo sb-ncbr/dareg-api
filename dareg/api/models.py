@@ -450,7 +450,6 @@ class WorkflowTemplate(PermsObject):
 
 class JobStatus(StrEnum):
     NEW = "new"
-    # TODO: detect jobs in assigning state and find out how to verify it is not already running
     ASSIGNING = "assigning"
     ASSIGNED = "assigned"
     RUNNING = "running"
@@ -537,6 +536,14 @@ class Job(PermsObject):
             if output_model_name not in allowed_output_models:
                 raise ValidationError({
                     "output_resource_content_type": f"Job output can only be related to Experiment or Dataset, not '{output_model_name}'."
+                })
+
+        # Require output_resource fields for WriteData workflows
+        if self.workflow_template and self.workflow_template.workflow_type == WorkflowType.WRITE_DATA:
+            if not self.output_resource_content_type or not self.output_resource_id:
+                raise ValidationError({
+                    "output_resource_content_type": "Output resource content type and ID are required for WriteData workflows.",
+                    "output_resource_id": "Output resource content type and ID are required for WriteData workflows."
                 })
 
         # Validate app_config against workflow template appConfigDetails
