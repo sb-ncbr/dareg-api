@@ -227,7 +227,7 @@ Let's set up a cluster where the workflow and OpenFaaS will be running. In our c
     - From bastion/worker to CP
     - From bastion/worker to Oneprovider
     - From CP to Oneprovider
-13. Finally, run the ansible playbook via command ```ansible-playbook -i hosts site.yml```
+13. Finally, run the ansible playbook via command ```   ```
 14. Hopefully, everything goes well. Now check whether there is a config on the Oneprovider machine at path you specified in step 9. In case of the README, it's ```/home/debian/oneprovider_config/99-openfaas.config```. Make sure the file exists and move it to the appropriate folder, where Oneprovider reads its configs. In case of our dev provider ```oneprovider01-devel-onedata-e-infra-cz``` the path for reading the config by Oneprovider is ```/opt/onedata/oneprovider/persistence/etc/op_worker/config.d/``` The config looks like this(delete the comments):
     - 
     ```
