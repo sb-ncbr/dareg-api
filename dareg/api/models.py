@@ -613,7 +613,7 @@ class Job(PermsObject):
             self.status = new_status
         elif self.status == JobStatus.ASSIGNED and new_status == JobStatus.RUNNING:
             self.status = new_status
-        elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
+        elif self.status in [JobStatus.ASSIGNED, JobStatus.RUNNING] and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
             self.status = new_status
         elif new_status == JobStatus.SUBMISSION_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING]:
             # Allow transition to SUBMISSION_ERROR from NEW/ASSIGNING states for submission failures
