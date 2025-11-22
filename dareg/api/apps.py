@@ -16,12 +16,17 @@ class ApiConfig(AppConfig):
         job_loop_interval = getattr(settings, "JOB_LOOP_INTERVAL", 60)
 
         def job_loop():
+            from django.db import connections
             engine = JobEngine()
             recovery_interval = getattr(settings, "JOB_RECOVERY_INTERVAL", 5)  # Run recovery every 5 cycles by default
             cycle_count = 0
 
             while True:
                 try:
+                    # Close all old connections before each iteration
+                    for conn in connections.all():
+                        conn.close_if_unusable_or_obsolete()
+
                     engine.schedule()
                     engine.poll()
 

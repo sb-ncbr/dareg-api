@@ -201,7 +201,7 @@ Let's set up a cluster where the workflow and OpenFaaS will be running. In our c
         # (ansible will adjust its configuration and restart it).
         oneprovider-vm ansible_host=147.251.255.78 ansible_user=<your-user-used-in-oneprovider-for-ssh, i.e. debian> # e.g. public IP of the one provider
       ```
-9. Improve ./roles/provider-config/tasks/main.yml to generate a config file for the Oneprovider on the Oneprovider machine
+9. Improve   to generate a config file for the Oneprovider on the Oneprovider machine
     - ```- name: Obtain openfaas password
             shell: |
                 kubectl -n "{{openfaas_namespace}}" get secret openfaas-basic-auth -o jsonpath="{.data.basic-auth-password}" | base64 --decode
