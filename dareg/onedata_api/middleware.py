@@ -323,8 +323,7 @@ def send_job(job: Job):
             },
             f"{store_id}": store_config
         },
-        "logLevel": "debug",
-        "callback": ""
+        "logLevel": "debug"
     }
 
     logger.info(f"Creating workflow execution with body: {json.dumps(body, indent=2)}")
