@@ -282,6 +282,9 @@ def calculate_dir_checksum(job: Job, algorithm: ChecksumAlgorithm) -> str:
     LOGS_STREAMER.info({"message": f"All child checksums: {child_checksums}"})
     dir_checksum = ",".join(child_checksums)
     LOGS_STREAMER.info({"message": f"DIR checksum: {dir_checksum}"})
+
+    if not dir_checksum:
+        dir_checksum = "placeholder"
     # Set checksum metadata for the directory itself
     if dir_checksum and xattr_name:
         try:
