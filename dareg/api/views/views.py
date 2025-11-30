@@ -497,6 +497,48 @@ class WorkflowTemplateViewSet(viewsets.ModelViewSet):
         verify_workflow_existence(instance)
         logger.info(f"Workflow template {instance.id} updated and validated successfully")
 
+    @action(detail=False, methods=['get'], url_path='(?P<entity_type>project|dataset|experiment)/(?P<entity_id>[^/.]+)')
+    def supported_workflows(self, request, entity_type=None, entity_id=None):
+        """
+        Retrieve workflows that can be run on a specific entity.
+        Usage: /api/v1/workflow/{entity_type}/{entity_id}/
+        where entity_type is one of: project, dataset, experiment
+        """
+        try:
+            entity_uuid = uuid.UUID(entity_id)
+        except (ValueError, AttributeError):
+            return Response(
+                {"error": "Invalid entity_id format. Must be a valid UUID."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Get the project based on entity type
+            if entity_type == "project":
+                project = Project.objects.get(id=entity_uuid)
+            elif entity_type == "dataset":
+                dataset = Dataset.objects.get(id=entity_uuid)
+                project = dataset.project
+            elif entity_type == "experiment":
+                experiment = Experiment.objects.get(id=entity_uuid)
+                project = experiment.dataset.project
+            else:
+                return Response(
+                    {"error": "Invalid entity_type. Must be one of: project, dataset, experiment"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get workflows assigned to the project
+            workflows = project.workflow_templates.all()
+            serializer = self.get_serializer(workflows, many=True)
+            return Response(serializer.data)
+
+        except (Project.DoesNotExist, Dataset.DoesNotExist, Experiment.DoesNotExist):
+            return Response(
+                {"error": f"{entity_type.capitalize()} with id {entity_id} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
 
 class JobViewSet(viewsets.ModelViewSet):
     from rest_framework.exceptions import MethodNotAllowed
@@ -518,4 +560,31 @@ class JobViewSet(viewsets.ModelViewSet):
         # Validation happens in serializer.validate() before this point
         job_instance = serializer.save(created_by=self.request.user, modified_by=self.request.user)
         logger.info(f"Saved job with id {job_instance.id}")
+
+    @action(detail=False, methods=['get'], url_path='entity/(?P<entity_id>[^/.]+)')
+    def list_by_input_entity(self, request, entity_id=None):
+        """
+        Retrieve all jobs that ran on a specific entity (Project, Dataset, or Experiment).
+        Usage: /api/v1/jobs/entity/{entity_id}/
+        """
+        try:
+            entity_uuid = uuid.UUID(entity_id)
+        except (ValueError, AttributeError):
+            return Response(
+                {"error": "Invalid entity_id format. Must be a valid UUID."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        jobs = self.queryset.filter(root_resource_id=entity_uuid)
+        serializer = self.get_serializer(jobs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='logs')
+    def logs(self, request, pk=None):
+        """
+        Retrieve logs for a specific job (placeholder endpoint).
+        Usage: /api/v1/jobs/{job_id}/logs/
+        """
+        # Placeholder implementation - returns sample log entries
+        return Response(["test", "test2", "test3"])
 

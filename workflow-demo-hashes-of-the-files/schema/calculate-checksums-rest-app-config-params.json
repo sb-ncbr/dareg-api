@@ -1,0 +1,465 @@
+{
+  "summary": "",
+  "schemaFormatVersion": 3,
+  "revision": {
+    "supplementaryAtmLambdas": {
+      "4dcd7348230e97186349c7143b8e7557cha1c2": {
+        "20": {
+          "schemaFormatVersion": 3,
+          "revision": {
+            "schemaFormatVersion": 3,
+            "originalRevisionNumber": 20,
+            "atmLambdaRevision": {
+              "_version": 1,
+              "_data": {
+                "summary": "",
+                "state": "draft",
+                "resultSpecs": [
+                  {
+                    "_version": 1,
+                    "_data": {
+                      "relayMethod": "returnValue",
+                      "name": "result",
+                      "dataSpec": {
+                        "_version": 2,
+                        "_data": {
+                          "type": "object",
+                          "_version": 1,
+                          "_data": {}
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "_version": 1,
+                    "_data": {
+                      "relayMethod": "filePipe",
+                      "name": "logs",
+                      "dataSpec": {
+                        "_version": 2,
+                        "_data": {
+                          "type": "object",
+                          "_version": 1,
+                          "_data": {}
+                        }
+                      }
+                    }
+                  }
+                ],
+                "resourceSpec": {
+                  "_version": 1,
+                  "_data": {
+                    "memoryRequested": 104857600,
+                    "memoryLimit": null,
+                    "ephemeralStorageRequested": 104857600,
+                    "ephemeralStorageLimit": null,
+                    "cpuRequested": 0.1,
+                    "cpuLimit": null
+                  }
+                },
+                "preferredBatchSize": 100,
+                "operationSpec": {
+                  "_version": 1,
+                  "_data": {
+                    "engine": "openfaas",
+                    "_version": 1,
+                    "_data": {
+                      "dockerImage": "filipbugosq/onedata-demo-hashes-of-the-file-app-config:v1.6",
+                      "dockerExecutionOptions": {
+                        "readonly": false,
+                        "oneclientOptions": "",
+                        "oneclientMountPoint": "/mnt/onedata",
+                        "mountOneclient": true
+                      }
+                    }
+                  }
+                },
+                "name": "calculate-checksum-rest-app-config",
+                "description": "",
+                "configParameterSpecs": [],
+                "argumentSpecs": [
+                  {
+                    "_version": 1,
+                    "_data": {
+                      "name": "config",
+                      "isOptional": false,
+                      "defaultValue": null,
+                      "dataSpec": {
+                        "_version": 2,
+                        "_data": {
+                          "type": "object",
+                          "_version": 1,
+                          "_data": {}
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "_version": 1,
+                    "_data": {
+                      "name": "inputFile",
+                      "isOptional": false,
+                      "defaultValue": null,
+                      "dataSpec": {
+                        "_version": 2,
+                        "_data": {
+                          "type": "file",
+                          "_version": 1,
+                          "_data": {
+                            "fileType": "ANY",
+                            "attributes": [
+                              "fileId",
+                              "type"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "_version": 1,
+                    "_data": {
+                      "name": "outputFile",
+                      "isOptional": false,
+                      "defaultValue": null,
+                      "dataSpec": {
+                        "_version": 2,
+                        "_data": {
+                          "type": "file",
+                          "_version": 1,
+                          "_data": {
+                            "fileType": "ANY",
+                            "attributes": [
+                              "fileId",
+                              "type"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "originalAtmLambdaId": "4dcd7348230e97186349c7143b8e7557cha1c2"
+        }
+      }
+    },
+    "schemaFormatVersion": 3,
+    "originalRevisionNumber": 5,
+    "atmWorkflowSchemaRevision": {
+      "_version": 1,
+      "_data": {
+        "stores": [
+          {
+            "_version": 1,
+            "_data": {
+              "type": "singleValue",
+              "requiresInitialContent": true,
+              "name": "input-files",
+              "id": "8ef862da9c661ccded6762af6d51449e50fc90",
+              "description": "",
+              "defaultInitialContent": null,
+              "config": {
+                "_version": 1,
+                "_data": {
+                  "itemDataSpec": {
+                    "_version": 2,
+                    "_data": {
+                      "type": "file",
+                      "_version": 1,
+                      "_data": {
+                        "fileType": "ANY",
+                        "attributes": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "_version": 1,
+            "_data": {
+              "type": "list",
+              "requiresInitialContent": false,
+              "name": "results",
+              "id": "00c9fb9ef9c021adfe56b86bc96fd8f2afdf06",
+              "description": "",
+              "defaultInitialContent": null,
+              "config": {
+                "_version": 1,
+                "_data": {
+                  "itemDataSpec": {
+                    "_version": 2,
+                    "_data": {
+                      "type": "object",
+                      "_version": 1,
+                      "_data": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "_version": 1,
+            "_data": {
+              "type": "singleValue",
+              "requiresInitialContent": true,
+              "name": "app-config",
+              "id": "cd644c29d451ad3eff2a03b828549b26b80162",
+              "description": "",
+              "defaultInitialContent": null,
+              "config": {
+                "_version": 1,
+                "_data": {
+                  "itemDataSpec": {
+                    "_version": 2,
+                    "_data": {
+                      "type": "object",
+                      "_version": 1,
+                      "_data": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "_version": 1,
+            "_data": {
+              "type": "singleValue",
+              "requiresInitialContent": true,
+              "name": "outputFile",
+              "id": "b3416eff41b9d7d0b2751d7f439a5995bfaa64",
+              "description": "",
+              "defaultInitialContent": null,
+              "config": {
+                "_version": 1,
+                "_data": {
+                  "itemDataSpec": {
+                    "_version": 2,
+                    "_data": {
+                      "type": "file",
+                      "_version": 1,
+                      "_data": {
+                        "fileType": "ANY",
+                        "attributes": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "state": "draft",
+        "lanes": [
+          {
+            "_version": 1,
+            "_data": {
+              "storeIteratorSpec": {
+                "_version": 1,
+                "_data": {
+                  "storeSchemaId": "8ef862da9c661ccded6762af6d51449e50fc90",
+                  "maxBatchSize": 4
+                }
+              },
+              "parallelBoxes": [
+                {
+                  "_version": 1,
+                  "_data": {
+                    "tasks": [
+                      {
+                        "_version": 1,
+                        "_data": {
+                          "timeSeriesStoreConfig": {
+                            "_version": 1,
+                            "_data": {
+                              "timeSeriesCollectionSchema": {
+                                "_version": 1,
+                                "_data": {
+                                  "timeSeriesSchemas": [
+                                    {
+                                      "_version": 1,
+                                      "_data": {
+                                        "unit": "bytesPerSec",
+                                        "nameGeneratorType": "exact",
+                                        "nameGenerator": "bytesProcessed",
+                                        "metrics": {
+                                          "sum5s": {
+                                            "_version": 1,
+                                            "_data": {
+                                              "retention": 1440,
+                                              "resolution": 5,
+                                              "aggregator": "sum"
+                                            }
+                                          },
+                                          "sum1m": {
+                                            "_version": 1,
+                                            "_data": {
+                                              "retention": 1440,
+                                              "resolution": 60,
+                                              "aggregator": "sum"
+                                            }
+                                          },
+                                          "sum1h": {
+                                            "_version": 1,
+                                            "_data": {
+                                              "retention": 1440,
+                                              "resolution": 3600,
+                                              "aggregator": "sum"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "_version": 1,
+                                      "_data": {
+                                        "unit": "countsPerSec",
+                                        "nameGeneratorType": "exact",
+                                        "nameGenerator": "filesProcessed",
+                                        "metrics": {
+                                          "sum5s": {
+                                            "_version": 1,
+                                            "_data": {
+                                              "retention": 1440,
+                                              "resolution": 5,
+                                              "aggregator": "sum"
+                                            }
+                                          },
+                                          "sum1m": {
+                                            "_version": 1,
+                                            "_data": {
+                                              "retention": 1440,
+                                              "resolution": 60,
+                                              "aggregator": "sum"
+                                            }
+                                          },
+                                          "sum1h": {
+                                            "_version": 1,
+                                            "_data": {
+                                              "retention": 1440,
+                                              "resolution": 3600,
+                                              "aggregator": "sum"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "dashboardSpec": null
+                            }
+                          },
+                          "resultMappings": [
+                            {
+                              "_version": 1,
+                              "_data": {
+                                "storeSchemaId": "00c9fb9ef9c021adfe56b86bc96fd8f2afdf06",
+                                "storeContentUpdateOptions": {
+                                  "_version": 1,
+                                  "_data": {
+                                    "type": "listStoreContentUpdateOptions",
+                                    "_version": 1,
+                                    "_data": {
+                                      "function": "append"
+                                    }
+                                  }
+                                },
+                                "resultName": "result"
+                              }
+                            },
+                            {
+                              "_version": 1,
+                              "_data": {
+                                "storeSchemaId": "WORKFLOW_SYSTEM_AUDIT_LOG",
+                                "storeContentUpdateOptions": {
+                                  "_version": 1,
+                                  "_data": {
+                                    "type": "auditLogStoreContentUpdateOptions",
+                                    "_version": 1,
+                                    "_data": {
+                                      "function": "append"
+                                    }
+                                  }
+                                },
+                                "resultName": "logs"
+                              }
+                            }
+                          ],
+                          "resourceSpecOverride": null,
+                          "name": "calculate-checksum-rest-app-config",
+                          "lambdaRevisionNumber": 20,
+                          "lambdaId": "4dcd7348230e97186349c7143b8e7557cha1c2",
+                          "lambdaConfig": {},
+                          "id": "25762e3b4a8d1a7d5849d23c239be0d3d72fe9",
+                          "argumentMappings": [
+                            {
+                              "_version": 1,
+                              "_data": {
+                                "valueBuilder": {
+                                  "_version": 1,
+                                  "_data": {
+                                    "valueBuilderType": "singleValueStoreContent",
+                                    "valueBuilderRecipe": "cd644c29d451ad3eff2a03b828549b26b80162"
+                                  }
+                                },
+                                "argumentName": "config"
+                              }
+                            },
+                            {
+                              "_version": 1,
+                              "_data": {
+                                "valueBuilder": {
+                                  "_version": 1,
+                                  "_data": {
+                                    "valueBuilderType": "iteratedItem",
+                                    "valueBuilderRecipe": null
+                                  }
+                                },
+                                "argumentName": "inputFile"
+                              }
+                            },
+                            {
+                              "_version": 1,
+                              "_data": {
+                                "valueBuilder": {
+                                  "_version": 1,
+                                  "_data": {
+                                    "valueBuilderType": "singleValueStoreContent",
+                                    "valueBuilderRecipe": "b3416eff41b9d7d0b2751d7f439a5995bfaa64"
+                                  }
+                                },
+                                "argumentName": "outputFile"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "name": "Parallel box",
+                    "id": "1929377f1b93a795813587e7e0f777dd0e4f81"
+                  }
+                }
+              ],
+              "name": "calculate-checksums",
+              "maxRetries": 1,
+              "instantFailureExceptionThreshold": 0.1,
+              "id": "a4ff4eadccc34717610e0f884640d9295df7ce",
+              "dashboardSpec": null
+            }
+          }
+        ],
+        "description": "",
+        "dashboardSpec": null
+      }
+    }
+  },
+  "originalAtmWorkflowSchemaId": "b0c253daaef9e2b76ed53d4109fd3b15ch3315",
+  "name": "calculate-checksums-rest-app-config-params"
+}

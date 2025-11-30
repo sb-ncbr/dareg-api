@@ -450,7 +450,6 @@ class WorkflowTemplate(PermsObject):
 
 class JobStatus(StrEnum):
     NEW = "new"
-    # TODO: detect jobs in assigning state and find out how to verify it is not already running
     ASSIGNING = "assigning"
     ASSIGNED = "assigned"
     RUNNING = "running"
@@ -539,6 +538,14 @@ class Job(PermsObject):
                     "output_resource_content_type": f"Job output can only be related to Experiment or Dataset, not '{output_model_name}'."
                 })
 
+        # Require output_resource fields for WriteData workflows
+        if self.workflow_template and self.workflow_template.workflow_type == WorkflowType.WRITE_DATA:
+            if not self.output_resource_content_type or not self.output_resource_id:
+                raise ValidationError({
+                    "output_resource_content_type": "Output resource content type and ID are required for WriteData workflows.",
+                    "output_resource_id": "Output resource content type and ID are required for WriteData workflows."
+                })
+
         # Validate app_config against workflow template appConfigDetails
         if self.workflow_template and self.app_config:
             # Check if workflow template has appConfigDetails
@@ -606,7 +613,7 @@ class Job(PermsObject):
             self.status = new_status
         elif self.status == JobStatus.ASSIGNED and new_status == JobStatus.RUNNING:
             self.status = new_status
-        elif self.status == JobStatus.RUNNING and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
+        elif self.status in [JobStatus.ASSIGNED, JobStatus.RUNNING] and new_status in [JobStatus.SUCCESS, JobStatus.FAILURE]:
             self.status = new_status
         elif new_status == JobStatus.SUBMISSION_ERROR and self.status in [JobStatus.NEW, JobStatus.ASSIGNING]:
             # Allow transition to SUBMISSION_ERROR from NEW/ASSIGNING states for submission failures
