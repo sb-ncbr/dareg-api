@@ -4,8 +4,8 @@ from django.conf import settings
 
 
 # Module-level constant for default job engine limits
-JOB_ENGINE_SUBMIT_LIMIT: int = 20
-JOB_ENGINE_POLL_LIMIT: int = 20
+JOB_ENGINE_SUBMIT_LIMIT: int = 10
+JOB_ENGINE_POLL_LIMIT: int = 10
 JOB_ENGINE_RECOVERY_LIMIT: int = 10
 JOB_ENGINE_RECOVERY_TIMEOUT_MINUTES: int = 5
 

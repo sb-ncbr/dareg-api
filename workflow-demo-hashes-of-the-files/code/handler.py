@@ -30,10 +30,12 @@ from typing import (
 import requests
 
 from onedata_lambda_utils.stats import AtmTimeSeriesMeasurementBuilder
+from onedata_lambda_utils.logging import AtmLogger
 from onedata_lambda_utils.streaming import AtmResultStreamer
 from onedata_lambda_utils.types import (
     AtmException,
     AtmFile,
+    AtmObject,
     AtmHeartbeatCallback,
     AtmJobBatchRequest,
     AtmJobBatchRequestCtx,
@@ -62,6 +64,9 @@ EXTENDED_REST_REQUEST_TIMEOUT: Final[int] = 120
 ## Lambda interface
 ##===================================================================
 
+LOGS_STREAMER: Final[AtmLogger[AtmObject]] = AtmLogger(
+    result_name="logs", synchronized=True
+)
 
 STATS_STREAMER: Final[AtmResultStreamer[AtmTimeSeriesMeasurement]] = AtmResultStreamer(
     result_name="stats", synchronized=False
@@ -164,15 +169,15 @@ def handle(
 
 def run_job(job: Job) -> Union[AtmException, JobResults]:
     file_type = job.args["inputFile"].get("type")
-    print("=== run_job called ===")
-    print(f"fileId: {job.args['inputFile'].get('fileId')}")
-    print(f"type: {file_type}")
-    print(f"domain: {job.ctx.get('oneproviderDomain')}")
+    LOGS_STREAMER.info({"message": "=== run_job called ==="})
+    LOGS_STREAMER.info({"message": f"fileId: {job.args['inputFile'].get('fileId')}"})
+    LOGS_STREAMER.info({"message": f"type: {file_type}"})
+    LOGS_STREAMER.info({"message": f"domain: {job.ctx.get('oneproviderDomain')}"})
     try:
         # Get config from job args (it's already a dict)
         config = job.args["config"]
         algorithm = config["algorithm"]
-        print(f"algorithm: {algorithm}")
+        LOGS_STREAMER.info({"message": f"algorithm: {algorithm}"})
 
         # Validate algorithm compatibility
         if algorithm not in AVAILABLE_CHECKSUM_ALGORITHMS:
@@ -183,29 +188,29 @@ def run_job(job: Job) -> Union[AtmException, JobResults]:
                 )
             )
         if file_type == "REG":
-            print("Processing REG file")
+            LOGS_STREAMER.info({"message": "Processing REG file"})
             data_stream = get_file_data_stream(job)
             checksum = calculate_checksum(algorithm, data_stream)
         elif file_type == "DIR":
-            print("Processing DIR file")
+            LOGS_STREAMER.info({"message": "Processing DIR file"})
             checksum = calculate_dir_checksum(job, algorithm)
         else:
-            print("Unknown file type")
+            LOGS_STREAMER.info({"message": "Unknown file type"})
             checksum = None
 
         xattr_name = config.get("metadataKey")
-        print(f"xattr_name: {xattr_name}")
-        print(f"checksum: {checksum}")
+        LOGS_STREAMER.info({"message": f"xattr_name: {xattr_name}"})
+        LOGS_STREAMER.info({"message": f"checksum: {checksum}"})
         if checksum and xattr_name:
             set_file_xattr(job, xattr_name, checksum)
     except requests.RequestException as ex:
-        print(f"RequestException: {ex}")
+        LOGS_STREAMER.info({"message": f"RequestException: {ex}"})
         return AtmException(exception=str(ex))
     except Exception:
-        print(f"Exception: {traceback.format_exc()}")
+        LOGS_STREAMER.info({"message": f"Exception: {traceback.format_exc()}"})
         return AtmException(exception=traceback.format_exc())
     else:
-        print("run_job completed successfully")
+        LOGS_STREAMER.info({"message": "run_job completed successfully"})
         return build_job_results(job, checksum)
     finally:
         _measurements_queue.put(FilesProcessed.build(value=1))
@@ -230,18 +235,18 @@ def list_dir_children(job: Job) -> list:
 
 def calculate_dir_checksum(job: Job, algorithm: ChecksumAlgorithm) -> str:
     """Recursively calculate checksum for DIR by concatenating child checksums."""
-    print("=== calculate_dir_checksum called ===")
-    print(f"DIR fileId: {job.args['inputFile'].get('fileId')}")
-    print(f"DIR domain: {job.ctx.get('oneproviderDomain')}")
-    print(f"DIR algorithm: {algorithm}")
+    LOGS_STREAMER.info({"message": "=== calculate_dir_checksum called ==="})
+    LOGS_STREAMER.info({"message": f"DIR fileId: {job.args['inputFile'].get('fileId')}"})
+    LOGS_STREAMER.info({"message": f"DIR domain: {job.ctx.get('oneproviderDomain')}"})
+    LOGS_STREAMER.info({"message": f"DIR algorithm: {algorithm}"})
     children = list_dir_children(job)
-    print(f"DIR children count: {len(children)}")
+    LOGS_STREAMER.info({"message": f"DIR children count: {len(children)}"})
     child_checksums = []
     # Get config from job args (it's already a dict)
     config = job.args["config"]
     xattr_name = config.get("metadataKey")
     for child in children:
-        print(f"DIR child fileId: {child.get('fileId')}, type: {child.get('type')}")
+        LOGS_STREAMER.info({"message": f"DIR child fileId: {child.get('fileId')}, type: {child.get('type')}"})
         try:
             child_job = Job(
                 ctx=job.ctx,
@@ -249,41 +254,44 @@ def calculate_dir_checksum(job: Job, algorithm: ChecksumAlgorithm) -> str:
             )
             file_type = child.get("type")
             if file_type == "REG":
-                print(f"Calculating checksum for REG child {child.get('fileId')}")
+                LOGS_STREAMER.info({"message": f"Calculating checksum for REG child {child.get('fileId')}"})
                 data_stream = get_file_data_stream(child_job)
                 checksum = calculate_checksum(algorithm, data_stream)
             elif file_type == "DIR":
-                print(f"Recursively calculating checksum for DIR child {child.get('fileId')}")
+                LOGS_STREAMER.info({"message": f"Recursively calculating checksum for DIR child {child.get('fileId')}"})
                 checksum = calculate_dir_checksum(child_job, algorithm)
             else:
-                print(f"Unknown child type for {child.get('fileId')}")
+                LOGS_STREAMER.info({"message": f"Unknown child type for {child.get('fileId')}"})
                 checksum = ""
             # Set checksum metadata for every child
-            print(f"Child checksum: {checksum}")
+            LOGS_STREAMER.info({"message": f"Child checksum: {checksum}"})
             if checksum and xattr_name:
                 try:
                     set_file_xattr(child_job, xattr_name, checksum)
-                    print(f"Successfully set metadata for child {child.get('fileId')}")
+                    LOGS_STREAMER.info({"message": f"Successfully set metadata for child {child.get('fileId')}"})
                 except Exception as ex:
-                    print(f"Failed to set metadata for child {child.get('fileId')}: {ex}")
+                    LOGS_STREAMER.info({"message": f"Failed to set metadata for child {child.get('fileId')}: {ex}"})
                     # Continue processing other children even if this one fails
             child_checksums.append(checksum or "")
         except Exception as ex:
-            print(f"Error processing child {child.get('fileId')}: {ex}")
-            print(f"Traceback: {traceback.format_exc()}")
+            LOGS_STREAMER.info({"message": f"Error processing child {child.get('fileId')}: {ex}"})
+            LOGS_STREAMER.info({"message": f"Traceback: {traceback.format_exc()}"})
             # Append empty checksum and continue with other children
             child_checksums.append("")
     # Concatenate all child checksums with comma separator for the DIR checksum
-    print(f"All child checksums: {child_checksums}")
+    LOGS_STREAMER.info({"message": f"All child checksums: {child_checksums}"})
     dir_checksum = ",".join(child_checksums)
-    print(f"DIR checksum: {dir_checksum}")
+    LOGS_STREAMER.info({"message": f"DIR checksum: {dir_checksum}"})
+
+    if not dir_checksum:
+        dir_checksum = "placeholder"
     # Set checksum metadata for the directory itself
     if dir_checksum and xattr_name:
         try:
             set_file_xattr(job, xattr_name, dir_checksum)
-            print(f"Successfully set metadata for DIR {job.args['inputFile'].get('fileId')}")
+            LOGS_STREAMER.info({"message": f"Successfully set metadata for DIR {job.args['inputFile'].get('fileId')}"})
         except Exception as ex:
-            print(f"Failed to set metadata for DIR {job.args['inputFile'].get('fileId')}: {ex}")
+            LOGS_STREAMER.info({"message": f"Failed to set metadata for DIR {job.args['inputFile'].get('fileId')}: {ex}"})
     return dir_checksum
 
 
@@ -330,21 +338,21 @@ def calculate_checksum(
 
 
 def set_file_xattr(job: Job, xattr_name: str, checksum: str) -> None:
-    print("=== set_file_xattr called ===")
-    print(f"fileId: {job.args['inputFile'].get('fileId')}")
-    print(f"type: {job.args['inputFile'].get('type')}")
-    print(f"domain: {job.ctx.get('oneproviderDomain')}")
-    print(f"xattr_name: {xattr_name}")
-    print(f"checksum: {checksum}")
+    LOGS_STREAMER.info({"message": "=== set_file_xattr called ==="})
+    LOGS_STREAMER.info({"message": f"fileId: {job.args['inputFile'].get('fileId')}"})
+    LOGS_STREAMER.info({"message": f"type: {job.args['inputFile'].get('type')}"})
+    LOGS_STREAMER.info({"message": f"domain: {job.ctx.get('oneproviderDomain')}"})
+    LOGS_STREAMER.info({"message": f"xattr_name: {xattr_name}"})
+    LOGS_STREAMER.info({"message": f"checksum: {checksum}"})
     url = build_file_rest_url(job, "metadata/xattrs")
-    print(f"PUT URL: {url}")
+    LOGS_STREAMER.info({"message": f"PUT URL: {url}"})
     headers = {
         "x-auth-token": job.ctx["accessToken"],
         "content-type": "application/json",
     }
-    print(f"Headers: {headers}")
+    LOGS_STREAMER.info({"message": f"Headers: {headers}"})
     payload = {xattr_name: checksum}
-    print(f"Payload: {payload}")
+    LOGS_STREAMER.info({"message": f"Payload: {payload}"})
     response = requests.put(
         url,
         headers=headers,
@@ -352,8 +360,8 @@ def set_file_xattr(job: Job, xattr_name: str, checksum: str) -> None:
         verify=VERIFY_SSL_CERTS,
         timeout=REST_REQUEST_TIMEOUT,
     )
-    print(f"DEBUG Response status: {response.status_code}")
-    print(f"DEBUG Response body: {response.text}")
+    LOGS_STREAMER.info({"message": f"DEBUG Response status: {response.status_code}"})
+    LOGS_STREAMER.info({"message": f"DEBUG Response body: {response.text}"})
     response.raise_for_status()
 
 
@@ -362,7 +370,7 @@ def build_file_rest_url(job: Job, subpath: str) -> str:
     file_id = job.args["inputFile"]["fileId"]
     subpath = subpath.lstrip("/")
 
-    print(f"https://{domain}/api/v3/oneprovider/data/{file_id}/{subpath}")
+    LOGS_STREAMER.info({"message": f"https://{domain}/api/v3/oneprovider/data/{file_id}/{subpath}"})
     return f"https://{domain}/api/v3/oneprovider/data/{file_id}/{subpath}"
 
 
