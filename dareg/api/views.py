@@ -38,7 +38,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
-    create_new_experiment, create_new_temp_token, get_file_metadata
+    delete_entry, create_new_experiment, create_new_temp_token, get_file_metadata
 
 
 class ProfileViewSet(viewsets.ModelViewSet):
@@ -317,6 +317,13 @@ class ExperimentViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         kwargs['partial'] = True
         return super().update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        experiment = Experiment.objects.get(id=self.kwargs.get('pk'))
+        
+        delete_entry(experiment.dataset.project, experiment.onedata_file_id)
+
+        return super().destroy(request, *args, **kwargs)
 
 
 class InstrumentViewSet(viewsets.ModelViewSet):
