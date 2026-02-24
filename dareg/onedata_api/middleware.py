@@ -154,6 +154,26 @@ def rename_entry(project: Project, file_entry_id: str, new_name: str):
     except Exception as e:
         print(f"Failed to rename directory. {e} {response.text}", flush=True)
         return {"error": f"Failed to rename directory. {e} {response.text}"}
+    
+
+def delete_entry(project: Project, file_entry_id: str):
+    oneprovider_configuration = oneprovider_client.configuration.Configuration()
+    oneprovider_configuration.host = project.facility.onedata_provider_url
+    oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
+
+    try:
+        print(f"Delete directory", flush=True)
+
+        url = f"{oneprovider_configuration.host}/data/{file_entry_id}"
+        headers = {
+            "X-Auth-Token": oneprovider_configuration.api_key['X-Auth-Token'],
+            "Content-Type": "application/json"
+        }
+        response = requests.delete(url, headers=headers) 
+        print(response.status_code, response.text, flush=True)  
+    except Exception as e:
+        print(f"Failed to delete directory. {e} {response.text}", flush=True)
+        return {"error": f"Failed to delete directory. {e} {response.text}"}
 
 
 def create_new_experiment(dataset: Dataset, experiment_id: str):
