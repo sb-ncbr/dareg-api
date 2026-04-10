@@ -295,7 +295,8 @@ class ExperimentViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=400)
 
         dataset = Dataset.objects.get(id=request.data.get('dataset'))
-        folder, err_folder = create_new_experiment(dataset, str(uuid.uuid4()))
+        name = request.data.get('name')
+        folder, err_folder = create_new_experiment(dataset, str(uuid.uuid4()), name)
         if err_folder:
             raise ValueError(err_folder)
 
