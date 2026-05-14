@@ -3,11 +3,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
 from django.apps import apps
-from django.db.models import Q, CharField, TextField, Value, FloatField, F
+from django.db.models import Q, CharField, TextField, Value, FloatField, F, JSONField
 from django.contrib.postgres.search import TrigramSimilarity
 from guardian.shortcuts import get_objects_for_user
 from rest_framework import serializers
 from django.db.models.functions import Greatest, Coalesce, Cast
+from django.db.models.fields.json import KeyTextTransform
 
 class GenericSearchPagination(LimitOffsetPagination):
     default_limit = 10
@@ -27,19 +28,24 @@ class GenericSearchResultSerializer(serializers.ModelSerializer):
 
     def get_highlights(self, obj):
         highlights = getattr(obj, '_matched_fields', None)
-        if highlights and isinstance(highlights, dict):
-            return [f"{key}: {value}" for key, value in highlights.items()]
-        return highlights
+        return highlights if highlights is not None else {}
 
     def get_model(self, obj):
         return obj.__class__.__name__
 
-def parse_query_block(field, expr, allowed_fields, field_types=None):
+def parse_query_block(field, expr, allowed_fields, field_types=None, json_field_names=None):
+    json_field_names = json_field_names or []
     # Normalize for metadata JSONField access
-    if "." in field:
-        lookup_field = "metadata__" + "__".join(field.split("."))
+    if field.startswith("metadata."):
+        lookup_field = "metadata__" + "__".join(field.split(".")[1:])
     else:
         lookup_field = field
+        if lookup_field not in allowed_fields:
+            # fallback to metadata-prefixed path
+            if "." in field:
+                lookup_field = "metadata__" + "__".join(field.split("."))
+            else:
+                lookup_field = "metadata__" + field
 
     if lookup_field not in allowed_fields:
         raise ValueError(f"Invalid field: {field}")
@@ -65,8 +71,17 @@ def parse_query_block(field, expr, allowed_fields, field_types=None):
             q &= Q(**{lookup_field: val})
         elif op == "$ne":
             q &= ~Q(**{lookup_field: val})
-        elif op in ["$gt", "$gte", "$lt", "$lte", "$contains"]:
+        elif op in ["$gt", "$gte", "$lt", "$lte"]:
             q &= Q(**{f"{lookup_field}__{op[1:]}": val})
+        elif op == "$contains":
+            base_field = lookup_field.split("__")[0]
+            if base_field in json_field_names and "__" in lookup_field:
+                # Nested JSON path: Django KeyTransform does not register
+                # __contains, so fall back to native __icontains which uses
+                # Postgres ->> + ILIKE underneath.
+                q &= Q(**{f"{lookup_field}__icontains": val})
+            else:
+                q &= Q(**{f"{lookup_field}__contains": val})
         elif op == "$regex":
             q &= Q(**{f"{lookup_field}__icontains": val})
         elif op == "$in":
@@ -86,17 +101,17 @@ def parse_query_block(field, expr, allowed_fields, field_types=None):
 
     return q
 
-def parse_filter_tree(filters, allowed_fields, field_types=None):
+def parse_filter_tree(filters, allowed_fields, field_types=None, json_field_names=None):
     if isinstance(filters, dict):
         if "$and" in filters:
-            return Q(*(parse_filter_tree(f, allowed_fields, field_types) for f in filters["$and"]))
+            return Q(*(parse_filter_tree(f, allowed_fields, field_types, json_field_names) for f in filters["$and"]))
         elif "$or" in filters:
             q = Q()
             for f in filters["$or"]:
-                q |= parse_filter_tree(f, allowed_fields, field_types)
+                q |= parse_filter_tree(f, allowed_fields, field_types, json_field_names)
             return q
         elif "$not" in filters:
-            return ~parse_filter_tree(filters["$not"], allowed_fields, field_types)
+            return ~parse_filter_tree(filters["$not"], allowed_fields, field_types, json_field_names)
 
         q = Q()
         for field, expr in filters.items():
@@ -104,7 +119,7 @@ def parse_filter_tree(filters, allowed_fields, field_types=None):
                 raise ValueError(f"Invalid logical operator '{field}' at this level")
             if not isinstance(expr, dict):
                 expr = {"$eq": expr}
-            q &= parse_query_block(field, expr, allowed_fields, field_types)
+            q &= parse_query_block(field, expr, allowed_fields, field_types, json_field_names)
         return q
 
     raise ValueError("Filters must be a dictionary")
@@ -127,28 +142,71 @@ def get_trigram_fields(model_class):
     }
     return list(declared & actual)
 
-def collect_highlights(obj, filters, query, trigram_fields):
-    highlights = {}
+def extract_filter_keys(filters):
+    """Recursively extract leaf field names from a nested filter dict."""
+    keys = []
+    if isinstance(filters, dict):
+        if "$and" in filters:
+            for group in filters["$and"]:
+                keys.extend(extract_filter_keys(group))
+        elif "$or" in filters:
+            for group in filters["$or"]:
+                keys.extend(extract_filter_keys(group))
+        elif "$not" in filters:
+            keys.extend(extract_filter_keys(filters["$not"]))
+        else:
+            for key in filters:
+                if not key.startswith("$"):
+                    keys.append(key)
+    elif isinstance(filters, list):
+        for item in filters:
+            keys.extend(extract_filter_keys(item))
+    return keys
 
-    for key in filters:
-        normalized_key = key.replace(".", " → ")
+
+def collect_highlights(obj, filters, query, trigram_fields, meta_trigram_fields=None, schema_metadata_fields=None):
+    meta_trigram_fields = meta_trigram_fields or []
+    schema_metadata_fields = schema_metadata_fields or []
+    highlights = {}
+    matched_keys = extract_filter_keys(filters)
+
+    for key in matched_keys:
         if key.startswith("metadata."):
             parts = key.split(".")[1:]
             value = getattr(obj, "metadata", {})
             for part in parts:
-                value = value.get(part, None)
-                if value is None:
+                if isinstance(value, dict):
+                    value = value.get(part, None)
+                else:
+                    value = None
                     break
             if value is not None:
-                highlights[normalized_key] = value
+                highlights[key] = value
         elif hasattr(obj, key):
-            highlights[normalized_key] = getattr(obj, key)
+            val = getattr(obj, key)
+            highlights[key] = val
+        elif key in schema_metadata_fields:
+            value = getattr(obj, "metadata", {})
+            if isinstance(value, dict) and key in value:
+                highlights[key] = value[key]
 
     if query:
         for field in trigram_fields:
             val = getattr(obj, field, None)
             if isinstance(val, str) and query.lower() in val.lower():
                 highlights[field] = val
+
+        for field_name in meta_trigram_fields:
+            parts = field_name.split(".")
+            value = getattr(obj, "metadata", {})
+            for part in parts:
+                if isinstance(value, dict):
+                    value = value.get(part, None)
+                else:
+                    value = None
+                    break
+            if isinstance(value, str) and query.lower() in value.lower():
+                highlights[f"metadata.{field_name}"] = value
 
     return highlights
 
@@ -173,9 +231,6 @@ class GeneralSearchViewSet(ViewSet):
             try:
                 model_class = apps.get_model("api", name)
                 trigram_fields = get_trigram_fields(model_class)
-
-                if query and not trigram_fields and not filters:
-                    continue
             except LookupError:
                 continue
 
@@ -183,6 +238,10 @@ class GeneralSearchViewSet(ViewSet):
 
             allowed_fields = list(model_class._meta.fields_map.keys()) + [f.name for f in model_class._meta.fields]
 
+            json_field_names = [f.name for f in model_class._meta.fields if isinstance(f, JSONField)]
+
+            meta_trigram_fields = []
+            metadata_fields = []
             if schema_id:
                 try:
                     schema_obj = Schema.objects.get(id=schema_id)
@@ -199,8 +258,15 @@ class GeneralSearchViewSet(ViewSet):
                     flatten_schema_types(metadata_schema)
                     orm_fields = ["metadata__" + f.replace(".", "__") for f in metadata_fields]
                     allowed_fields += orm_fields
+                    # Collect string metadata paths for native trigram search
+                    for f_name, f_type in field_types.items():
+                        if f_type == "string":
+                            meta_trigram_fields.append(f_name)
                 except Schema.DoesNotExist:
                     continue
+
+            if query and not trigram_fields and not meta_trigram_fields and not filters:
+                continue
             print(f"Searching in model: {name} with allowed fields: {allowed_fields}", flush=True)
 
             # Handle filters
@@ -208,20 +274,32 @@ class GeneralSearchViewSet(ViewSet):
             if filters:
                 print(f"Applying filters: {filters}", flush=True)
                 try:
-                    q = parse_filter_tree(filters, allowed_fields, field_types if schema_id else None)
+                    q = parse_filter_tree(filters, allowed_fields, field_types if schema_id else None, json_field_names)
                 except ValueError as e:
                     return Response({"error": str(e)}, status=400)
                 
             print(f"Parsed query: {q}", flush=True)
 
-            if query and trigram_fields:
-                annotations = {
-                    f"sim_{field}": TrigramSimilarity(
+            if query and (trigram_fields or meta_trigram_fields):
+                annotations = {}
+                for field in trigram_fields:
+                    annotations[f"sim_{field}"] = TrigramSimilarity(
                         Cast(Coalesce(F(field), Value("")), output_field=TextField()),
                         Cast(Value(query), output_field=TextField())
                     )
-                    for field in trigram_fields
-                }
+
+                for field_name in meta_trigram_fields:
+                    # Build KeyTextTransform chain for metadata path
+                    # KeyTextTransform uses native Postgres ->> / #>> operators
+                    parts = field_name.split(".")
+                    expr = "metadata"
+                    for part in parts:
+                        expr = KeyTextTransform(part, expr)
+                    annotations[f"sim_meta_{field_name.replace('.', '_')}"] = TrigramSimilarity(
+                        Cast(Coalesce(expr, Value("")), output_field=TextField()),
+                        Cast(Value(query), output_field=TextField())
+                    )
+
                 if annotations:
                     base_qs = base_qs.annotate(**annotations)
                     if len(annotations) >= 2:
@@ -234,7 +312,7 @@ class GeneralSearchViewSet(ViewSet):
             qs = base_qs.filter(q).distinct()
 
             for obj in qs:
-                obj._matched_fields = collect_highlights(obj, filters, query, trigram_fields)
+                obj._matched_fields = collect_highlights(obj, filters, query, trigram_fields, meta_trigram_fields, metadata_fields)
                 results.append(obj)
 
         paginator = self.pagination_class()
