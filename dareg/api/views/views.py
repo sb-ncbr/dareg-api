@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from importlib.metadata import metadata
+import logging
 
 import oneprovider_client
 import requests
@@ -14,9 +15,9 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
-
-from .models import Facility, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment
-from .serializers import (
+from api.models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
+from api.serializers import (
+    JobSerializer,
     UserSerializer,
     GroupSerializer,
     FacilitySerializer,
@@ -26,9 +27,10 @@ from .serializers import (
     ProfileSerializer,
     ReservationSerializer,
     InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer,
-    ProjectResponseSerializer
+    ProjectResponseSerializer,
+    WorkflowTemplateSerializer
 )
-from .permissions import NestedPerms, update_perms, SameUser
+from ..permissions import NestedPerms, update_perms, SameUser
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
@@ -37,9 +39,9 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, \
-    delete_entry, create_new_experiment, create_new_temp_token, get_file_metadata
+from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, delete_entry, create_new_experiment, create_new_temp_token, get_file_metadata, verify_job, verify_workflow_template, verify_workflow_existence
 
+logger = logging.getLogger(__name__)
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
@@ -278,7 +280,6 @@ class DatasetViewSet(viewsets.ModelViewSet):
 
         return super().create(request, *args, **kwargs)
 
-
 class ExperimentViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows experiments to be viewed or edited.
@@ -293,7 +294,8 @@ class ExperimentViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=400)
 
         dataset = Dataset.objects.get(id=request.data.get('dataset'))
-        folder, err_folder = create_new_experiment(dataset, str(uuid.uuid4()))
+        name = request.data.get('name')
+        folder, err_folder = create_new_experiment(dataset, str(uuid.uuid4()), name)
         if err_folder:
             raise ValueError(err_folder)
 
@@ -477,3 +479,119 @@ class TempTokenAPIView(APIView):
         if serializer.is_valid():
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WorkflowTemplateViewSet(viewsets.ModelViewSet):
+    queryset = WorkflowTemplate.objects.all()
+    serializer_class = WorkflowTemplateSerializer
+    permission_classes = [NestedPerms, IsAuthenticated]
+
+    # Override the create method to set the created_by field
+    def perform_create(self, serializer):
+        logger.info("Creating a new workflow template viewset")
+        WorkflowTemplate.clean()
+        # Check permissions for the workflow template creation
+        serializer.save(created_by=self.request.user)
+
+    # Override the update method to validate workflow parameters
+    def perform_update(self, serializer):
+        logger.info("Updating workflow template in API viewset")
+        # Save the instance first to get the updated WorkflowTemplate object
+        instance = serializer.save(modified_by=self.request.user)
+        logger.info(f"Validating updated workflow template with id {instance.id}")
+        # Validate workflow parameters (same as admin does)
+        verify_workflow_template(instance)
+        verify_workflow_existence(instance)
+        logger.info(f"Workflow template {instance.id} updated and validated successfully")
+
+    @action(detail=False, methods=['get'], url_path='(?P<entity_type>project|dataset|experiment)/(?P<entity_id>[^/.]+)')
+    def supported_workflows(self, request, entity_type=None, entity_id=None):
+        """
+        Retrieve workflows that can be run on a specific entity.
+        Usage: /api/v1/workflow/{entity_type}/{entity_id}/
+        where entity_type is one of: project, dataset, experiment
+        """
+        try:
+            entity_uuid = uuid.UUID(entity_id)
+        except (ValueError, AttributeError):
+            return Response(
+                {"error": "Invalid entity_id format. Must be a valid UUID."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Get the project based on entity type
+            if entity_type == "project":
+                project = Project.objects.get(id=entity_uuid)
+            elif entity_type == "dataset":
+                dataset = Dataset.objects.get(id=entity_uuid)
+                project = dataset.project
+            elif entity_type == "experiment":
+                experiment = Experiment.objects.get(id=entity_uuid)
+                project = experiment.dataset.project
+            else:
+                return Response(
+                    {"error": "Invalid entity_type. Must be one of: project, dataset, experiment"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get workflows assigned to the project
+            workflows = project.workflow_templates.all()
+            serializer = self.get_serializer(workflows, many=True)
+            return Response(serializer.data)
+
+        except (Project.DoesNotExist, Dataset.DoesNotExist, Experiment.DoesNotExist):
+            return Response(
+                {"error": f"{entity_type.capitalize()} with id {entity_id} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class JobViewSet(viewsets.ModelViewSet):
+    from rest_framework.exceptions import MethodNotAllowed
+
+    def update(self, request, *args, **kwargs):
+        raise self.MethodNotAllowed('PUT', detail="Job instances are not updateable.")
+
+    def partial_update(self, request, *args, **kwargs):
+        raise self.MethodNotAllowed('PATCH', detail="Job instances are not updateable.")
+    
+    queryset = Job.objects.all()
+    serializer_class = JobSerializer
+    permission_classes = [NestedPerms, IsAuthenticated]
+
+    # Override the create method to set the created_by field
+    def perform_create(self, serializer):
+        logger.info("Creating a job viewset")
+
+        # Validation happens in serializer.validate() before this point
+        job_instance = serializer.save(created_by=self.request.user, modified_by=self.request.user)
+        logger.info(f"Saved job with id {job_instance.id}")
+
+    @action(detail=False, methods=['get'], url_path='entity/(?P<entity_id>[^/.]+)')
+    def list_by_input_entity(self, request, entity_id=None):
+        """
+        Retrieve all jobs that ran on a specific entity (Project, Dataset, or Experiment).
+        Usage: /api/v1/jobs/entity/{entity_id}/
+        """
+        try:
+            entity_uuid = uuid.UUID(entity_id)
+        except (ValueError, AttributeError):
+            return Response(
+                {"error": "Invalid entity_id format. Must be a valid UUID."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        jobs = self.queryset.filter(root_resource_id=entity_uuid)
+        serializer = self.get_serializer(jobs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='logs')
+    def logs(self, request, pk=None):
+        """
+        Retrieve logs for a specific job (placeholder endpoint).
+        Usage: /api/v1/jobs/{job_id}/logs/
+        """
+        # Placeholder implementation - returns sample log entries
+        return Response(["test", "test2", "test3"])
+

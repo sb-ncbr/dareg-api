@@ -2,20 +2,23 @@ from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 from typing import Any
 from django.contrib import admin
+import logging
 
 from django.urls import reverse
 from onedata_wrapper.models.filesystem.entry_request import EntryRequest
 
 from .models import (
     Facility,
+    Job,
     PermsGroup,
     Project,
     Dataset,
     Schema,
     Language,
-    UserProfile, Instrument, Experiment
+    UserProfile, Instrument, Experiment,
+    WorkflowTemplate
 )
-from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset
+from onedata_api.middleware import verify_job, verify_workflow_existence, verify_workflow_template, create_new_dataset, create_public_share, establish_dataset
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.http import HttpRequest
@@ -29,6 +32,7 @@ from knox.models import AuthTokenManager
 from django.utils import timezone
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
+logger = logging.getLogger(__name__)
 
 class TimeStampFilter(admin.SimpleListFilter):
         title = 'Date and time'
@@ -292,6 +296,49 @@ class UserAdmin(BaseUserAdmin):
     
     inlines = [UserProfileInline]
 
+class WorkflowTemplateAdmin(BaseModelAdmin):
+    list_display = ('name',) + BaseModelAdmin.list_display
+    search_fields = ('name', 'status')
+
+    def save_model(self, request, obj, form, change):
+        logger.info("Verifying job in admin save_model") 
+        verify_workflow_template(obj)
+        verify_workflow_existence(obj)
+        # verify_workflow_stores(obj)
+        logger.info(f"Saving workflow with id {obj.id if obj.id else 'new'}")
+        if not change:
+            obj.created_by = request.user
+        obj.modified_by = request.user
+        obj.save()
+
+class JobAdmin(BaseModelAdmin):
+    from rest_framework.exceptions import MethodNotAllowed
+    list_display = ('name', 'status') + BaseModelAdmin.list_display
+    search_fields = ('name', 'status')
+    exclude = ('job_submission_counter', 'job_polling_counter', 'claimed', 'claimed_at')
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            from django.core.exceptions import PermissionDenied
+            raise self.MethodNotAllowed("Job instances are not updateable.")
+
+        logger.info("Validating job in admin save_model")
+        # Explicitly call clean() to validate app_config
+        obj.clean()
+
+        logger.info("Verifying job runtime requirements in admin save_model")
+        # Verify runtime requirements (external resources)
+        verify_job(obj)
+
+        logger.info(f"Saving job with id {obj.id if obj.id else 'new'}")
+        obj.created_by = request.user
+        obj.modified_by = request.user
+        obj.save()
+
+    def delete_model(self, request, obj):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Job instances cannot be deleted.")
+
 def _change_group_display_name(group: Group) -> str:
     try:
         g = PermsGroup.objects.get(id=group.id)
@@ -365,3 +412,5 @@ admin.site.register(Language)
 
 admin.site.unregister(AuthToken)
 admin.site.register(AuthToken, AuthTokenAdmin)
+admin.site.register(WorkflowTemplate, WorkflowTemplateAdmin)
+admin.site.register(Job, JobAdmin)

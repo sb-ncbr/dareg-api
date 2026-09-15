@@ -3,8 +3,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
 
-from .models import Facility, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
-    ExperimentStatus
+from .models import Facility, Job, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
+    ExperimentStatus, WorkflowTemplate
 
 
 class UserSerializerMinimal(serializers.ModelSerializer):
@@ -232,3 +232,52 @@ class TempTokenSerializer(serializers.Serializer):
     token = serializers.CharField()
     provider_url = serializers.CharField()
     one_data_directory_id = serializers.CharField()
+
+class WorkflowTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowTemplate
+        fields = "__all__"
+        read_only_fields = ["id", "created_by", "modified_by"]
+
+    def validate(self, attrs):
+        # Create a temporary instance to trigger model validation
+        instance = WorkflowTemplate(**attrs)
+        instance.clean()
+        return attrs
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return WorkflowTemplate.objects.create(**validated_data)
+    
+class JobSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = [
+            'created', 'modified', 'id', 'created_by', 'modified_by',
+            'workflow_template', 'root_resource_content_type', 'root_resource_id',
+            'output_resource_content_type', 'output_resource_id',
+            'name', 'description', 'status',
+            'app_config', 'start_time', 'end_time', 'log_level'
+        ]
+        read_only_fields = ["id", "created_by", "modified_by"]
+
+    def validate(self, attrs):
+        from onedata_api.middleware import verify_job
+
+        # Create a temporary instance to trigger model validation
+        instance = Job(**attrs)
+        instance.clean()
+
+        # Verify job runtime requirements before saving
+        try:
+            verify_job(instance)
+        except ValueError as e:
+            raise serializers.ValidationError({"app_config": str(e)})
+
+        return attrs
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+
+        return Job.objects.create(**validated_data)
