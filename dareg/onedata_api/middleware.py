@@ -120,7 +120,7 @@ def rename_entry(project: Project, file_entry_id: str, new_name: str):
 
     path = None
     try:
-        url = f"{oneprovider_configuration.host}/data/{file_entry_id}"
+        url = f"{oneprovider_configuration.host}/data/{file_entry_id}?attributes=path"
         headers = {
             "X-Auth-Token": oneprovider_configuration.api_key['X-Auth-Token'],
             "Content-Type": "application/json"
@@ -158,7 +158,7 @@ def rename_entry(project: Project, file_entry_id: str, new_name: str):
         return {"error": f"Failed to rename directory. {e} {response.text}"}
 
 
-def create_new_experiment(dataset: Dataset, experiment_id: str):
+def create_new_experiment(dataset: Dataset, experiment_id: str, name: str | None = None):
     oneprovider_configuration = oneprovider_client.configuration.Configuration()
     oneprovider_configuration.host = dataset.project.facility.onedata_provider_url
     oneprovider_configuration.api_key['X-Auth-Token'] = dataset.project.facility.onedata_token
@@ -169,7 +169,7 @@ def create_new_experiment(dataset: Dataset, experiment_id: str):
     parent_er = EntryRequest(file_id=dataset.onedata_file_id)
     new_file = None
     try:
-        dir_request = NewDirectoryRequest(parent=parent_er, name=experiment_id)
+        dir_request = NewDirectoryRequest(parent=parent_er, name=name or experiment_id)
         newfile_entry_request = file_op_api.new_entry(dir_request)
         new_file = file_op_api.get_file(newfile_entry_request, FA_ALL)
     except Exception as e:
@@ -203,7 +203,7 @@ def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset
     try:
         print(f"Create temp token", flush=True)
         #TODO: configurable url
-        url = f"https://onezone.devel.onedata.e-infra.cz/api/v3/onezone/user/tokens/temporary"
+        url = f"https://onedata.e-infra.cz/api/v3/onezone/user/tokens/temporary"
         headers = {
             "X-Auth-Token": facility.onedata_token,
             "Content-Type": "application/json"
