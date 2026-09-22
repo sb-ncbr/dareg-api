@@ -2,6 +2,7 @@ from django.contrib.auth.models import User, Group
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
+from jsonschema import Draft7Validator, SchemaError
 
 from .models import Facility, Job, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
     ExperimentStatus, WorkflowTemplate
@@ -199,6 +200,43 @@ class DatasetSerializer(serializers.ModelSerializer):
 
     def to_representation(self, data):
         return DatasetResponseSerializer(context=self.context).to_representation(data)
+
+    def validate(self, attrs):
+        """Validate metadata against the selected dataset schema."""
+        
+        # getting schema submitted by dataset request
+        schema = attrs.get("schema")
+
+        # if schema not present, use already existing schema assigned to dataset
+        if schema is None and self.instance is not None:
+            schema = self.instance.schema
+
+        # allowing datasets without schema
+        if schema is None:
+            return attrs
+
+        # skipping validation when metadata was not changed
+        if "metadata" not in attrs and self.instance is not None:
+            return attrs
+
+        metadata = attrs.get("metadata", {})
+        try:
+            validator = Draft7Validator(schema.schema)
+            validation_errors = sorted(
+                validator.iter_errors(metadata),
+                key=lambda error: list(error.path),
+            )
+        except SchemaError as error:
+            raise serializers.ValidationError({
+                "schema": f"The selected schema is invalid: {error.message}"
+            })
+
+        if validation_errors:
+            raise serializers.ValidationError({
+                "metadata": [error.message for error in validation_errors]
+            })
+
+        return attrs
     
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user

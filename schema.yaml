@@ -1,0 +1,3984 @@
+openapi: 3.0.3
+info:
+  title: ""
+  version: 0.0.0
+paths:
+  /api/schema/:
+    get:
+      operationId: api_schema_retrieve
+      description: |-
+        OpenApi3 schema for this API. Format can be selected via content negotiation.
+
+        - YAML: application/vnd.oai.openapi
+        - JSON: application/vnd.oai.openapi+json
+      parameters:
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum:
+              - json
+              - yaml
+        - in: query
+          name: lang
+          schema:
+            type: string
+            enum:
+              - af
+              - ar
+              - ar-dz
+              - ast
+              - az
+              - be
+              - bg
+              - bn
+              - br
+              - bs
+              - ca
+              - ckb
+              - cs
+              - cy
+              - da
+              - de
+              - dsb
+              - el
+              - en
+              - en-au
+              - en-gb
+              - eo
+              - es
+              - es-ar
+              - es-co
+              - es-mx
+              - es-ni
+              - es-ve
+              - et
+              - eu
+              - fa
+              - fi
+              - fr
+              - fy
+              - ga
+              - gd
+              - gl
+              - he
+              - hi
+              - hr
+              - hsb
+              - hu
+              - hy
+              - ia
+              - id
+              - ig
+              - io
+              - is
+              - it
+              - ja
+              - ka
+              - kab
+              - kk
+              - km
+              - kn
+              - ko
+              - ky
+              - lb
+              - lt
+              - lv
+              - mk
+              - ml
+              - mn
+              - mr
+              - ms
+              - my
+              - nb
+              - ne
+              - nl
+              - nn
+              - os
+              - pa
+              - pl
+              - pt
+              - pt-br
+              - ro
+              - ru
+              - sk
+              - sl
+              - sq
+              - sr
+              - sr-latn
+              - sv
+              - sw
+              - ta
+              - te
+              - tg
+              - th
+              - tk
+              - tr
+              - tt
+              - udm
+              - uk
+              - ur
+              - uz
+              - vi
+              - zh-hans
+              - zh-hant
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+        - {}
+      responses:
+        "200":
+          content:
+            application/vnd.oai.openapi:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/vnd.oai.openapi+json:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ""
+  /api/token/login/:
+    post:
+      operationId: api_token_login_create
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: No response body
+  /api/token/logout/:
+    post:
+      operationId: api_token_logout_create
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+      responses:
+        "200":
+          description: No response body
+  /api/token/logoutall/:
+    post:
+      operationId: api_token_logoutall_create
+      description: |-
+        Log the user out of all sessions
+        I.E. deletes all auth tokens for the user
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+      responses:
+        "200":
+          description: No response body
+  /api/v1/datasets/:
+    get:
+      operationId: api_v1_datasets_list
+      description: API endpoint that allows dataset to be viewed or edited.
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDatasetResponseList"
+          description: ""
+    post:
+      operationId: api_v1_datasets_create
+      description: API endpoint that allows dataset to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+  /api/v1/datasets/{id}/:
+    get:
+      operationId: api_v1_datasets_retrieve
+      description: API endpoint that allows dataset to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this dataset.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+    put:
+      operationId: api_v1_datasets_update
+      description: API endpoint that allows dataset to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this dataset.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+    patch:
+      operationId: api_v1_datasets_partial_update
+      description: API endpoint that allows dataset to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this dataset.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedDataset"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedDataset"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedDataset"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+    delete:
+      operationId: api_v1_datasets_destroy
+      description: API endpoint that allows dataset to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this dataset.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/datasets/{id}/get_by_reservation_id/:
+    get:
+      operationId: api_v1_datasets_get_by_reservation_id_retrieve
+      description: API endpoint that allows dataset to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this dataset.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+  /api/v1/datasets/create_dataset/:
+    post:
+      operationId: api_v1_datasets_create_dataset_create
+      description: API endpoint that allows dataset to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+  /api/v1/datasets/create_onedata_folder/:
+    post:
+      operationId: api_v1_datasets_create_onedata_folder_create
+      description: API endpoint that allows dataset to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+  /api/v1/datasets/create_public_share/:
+    post:
+      operationId: api_v1_datasets_create_public_share_create
+      description: API endpoint that allows dataset to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+  /api/v1/datasets/shadow/:
+    post:
+      operationId: api_v1_datasets_shadow_create
+      description: API endpoint that allows dataset to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Dataset"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetResponse"
+          description: ""
+  /api/v1/experiments/:
+    get:
+      operationId: api_v1_experiments_list
+      description: API endpoint that allows experiments to be viewed or edited.
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedExperimentList"
+          description: ""
+    post:
+      operationId: api_v1_experiments_create
+      description: API endpoint that allows experiments to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Experiment"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Experiment"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Experiment"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+          description: ""
+  /api/v1/experiments/{id}/:
+    get:
+      operationId: api_v1_experiments_retrieve
+      description: API endpoint that allows experiments to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this experiment.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+          description: ""
+    put:
+      operationId: api_v1_experiments_update
+      description: API endpoint that allows experiments to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this experiment.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Experiment"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Experiment"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Experiment"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+          description: ""
+    patch:
+      operationId: api_v1_experiments_partial_update
+      description: API endpoint that allows experiments to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this experiment.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedExperiment"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedExperiment"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedExperiment"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+          description: ""
+    delete:
+      operationId: api_v1_experiments_destroy
+      description: API endpoint that allows experiments to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this experiment.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/facilities/:
+    get:
+      operationId: api_v1_facilities_list
+      description: API endpoint that allows facilities to be viewed or edited.
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedFacilityList"
+          description: ""
+    post:
+      operationId: api_v1_facilities_create
+      description: API endpoint that allows facilities to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Facility"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Facility"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Facility"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Facility"
+          description: ""
+  /api/v1/facilities/{id}/:
+    get:
+      operationId: api_v1_facilities_retrieve
+      description: API endpoint that allows facilities to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this facility.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Facility"
+          description: ""
+    put:
+      operationId: api_v1_facilities_update
+      description: API endpoint that allows facilities to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this facility.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Facility"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Facility"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Facility"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Facility"
+          description: ""
+    patch:
+      operationId: api_v1_facilities_partial_update
+      description: API endpoint that allows facilities to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this facility.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedFacility"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedFacility"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedFacility"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Facility"
+          description: ""
+    delete:
+      operationId: api_v1_facilities_destroy
+      description: API endpoint that allows facilities to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this facility.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/groups/:
+    get:
+      operationId: api_v1_groups_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedGroupList"
+          description: ""
+    post:
+      operationId: api_v1_groups_create
+      description: API endpoint that allows groups to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Group"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Group"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Group"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+          description: ""
+  /api/v1/groups/{id}/:
+    get:
+      operationId: api_v1_groups_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this group.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+          description: ""
+    put:
+      operationId: api_v1_groups_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this group.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Group"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Group"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Group"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+          description: ""
+    patch:
+      operationId: api_v1_groups_partial_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this group.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedGroup"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedGroup"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedGroup"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+          description: ""
+    delete:
+      operationId: api_v1_groups_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this group.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/instrument/:
+    get:
+      operationId: api_v1_instrument_list
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedInstrumentList"
+          description: ""
+    post:
+      operationId: api_v1_instrument_create
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Instrument"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Instrument"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Instrument"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+          description: ""
+  /api/v1/instrument/{id}/:
+    get:
+      operationId: api_v1_instrument_retrieve
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this instrument.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+          description: ""
+    put:
+      operationId: api_v1_instrument_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this instrument.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Instrument"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Instrument"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Instrument"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+          description: ""
+    patch:
+      operationId: api_v1_instrument_partial_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this instrument.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedInstrument"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedInstrument"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedInstrument"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+          description: ""
+    delete:
+      operationId: api_v1_instrument_destroy
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this instrument.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/instrument/metadata/:
+    get:
+      operationId: api_v1_instrument_metadata_retrieve
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+          description: ""
+  /api/v1/jobs/:
+    get:
+      operationId: api_v1_jobs_list
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedJobList"
+          description: ""
+    post:
+      operationId: api_v1_jobs_create
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Job"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Job"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Job"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+          description: ""
+  /api/v1/jobs/{id}/:
+    get:
+      operationId: api_v1_jobs_retrieve
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this job.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+          description: ""
+    put:
+      operationId: api_v1_jobs_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this job.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Job"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Job"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Job"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+          description: ""
+    patch:
+      operationId: api_v1_jobs_partial_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this job.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedJob"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedJob"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedJob"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+          description: ""
+    delete:
+      operationId: api_v1_jobs_destroy
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this job.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/jobs/{id}/logs/:
+    get:
+      operationId: api_v1_jobs_logs_retrieve
+      description: |-
+        Retrieve logs for a specific job (placeholder endpoint).
+        Usage: /api/v1/jobs/{job_id}/logs/
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this job.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+          description: ""
+  /api/v1/jobs/entity/{entity_id}/:
+    get:
+      operationId: api_v1_jobs_entity_retrieve
+      description: |-
+        Retrieve all jobs that ran on a specific entity (Project, Dataset, or Experiment).
+        Usage: /api/v1/jobs/entity/{entity_id}/
+      parameters:
+        - in: path
+          name: entity_id
+          schema:
+            type: string
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+          description: ""
+  /api/v1/profile/:
+    get:
+      operationId: api_v1_profile_list
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedProfileList"
+          description: ""
+    post:
+      operationId: api_v1_profile_create
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Profile"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Profile"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Profile"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+          description: ""
+  /api/v1/profile/{id}/:
+    get:
+      operationId: api_v1_profile_retrieve
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this user profile.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+          description: ""
+    put:
+      operationId: api_v1_profile_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this user profile.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Profile"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Profile"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Profile"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+          description: ""
+    patch:
+      operationId: api_v1_profile_partial_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this user profile.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedProfile"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedProfile"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedProfile"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+          description: ""
+    delete:
+      operationId: api_v1_profile_destroy
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this user profile.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/projects/:
+    get:
+      operationId: api_v1_projects_list
+      description: API endpoint that allows project to be viewed or edited.
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedProjectResponseList"
+          description: ""
+    post:
+      operationId: api_v1_projects_create
+      description: API endpoint that allows project to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Project"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Project"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Project"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+          description: ""
+  /api/v1/projects/{id}/:
+    get:
+      operationId: api_v1_projects_retrieve
+      description: API endpoint that allows project to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this project.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+          description: ""
+    put:
+      operationId: api_v1_projects_update
+      description: API endpoint that allows project to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this project.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Project"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Project"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Project"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+          description: ""
+    patch:
+      operationId: api_v1_projects_partial_update
+      description: API endpoint that allows project to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this project.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedProject"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedProject"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedProject"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+          description: ""
+    delete:
+      operationId: api_v1_projects_destroy
+      description: API endpoint that allows project to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this project.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/query/:
+    post:
+      operationId: api_v1_query_create
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          description: No response body
+  /api/v1/reservation/:
+    get:
+      operationId: api_v1_reservation_retrieve
+      parameters:
+        - in: query
+          name: date_from
+          schema:
+            type: string
+          description: ISO formated FROM timestamp
+          required: true
+        - in: query
+          name: date_to
+          schema:
+            type: string
+          description: ISO formated TO timestamp
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+          description: Created. New resource in response
+  /api/v1/reservation/{id}/:
+    get:
+      operationId: api_v1_reservation_retrieve_2
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+          description: Reservation details
+        "404":
+          description: Reservation not found
+  /api/v1/schemas/:
+    get:
+      operationId: api_v1_schemas_list
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedSchemaList"
+          description: ""
+    post:
+      operationId: api_v1_schemas_create
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Schema"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Schema"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Schema"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schema"
+          description: ""
+  /api/v1/schemas/{id}/:
+    get:
+      operationId: api_v1_schemas_retrieve
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this schema.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schema"
+          description: ""
+    put:
+      operationId: api_v1_schemas_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this schema.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Schema"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/Schema"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/Schema"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schema"
+          description: ""
+    patch:
+      operationId: api_v1_schemas_partial_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this schema.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedSchema"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedSchema"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedSchema"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schema"
+          description: ""
+    delete:
+      operationId: api_v1_schemas_destroy
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this schema.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/schemas/{schema_id}/fields/:
+    get:
+      operationId: api_v1_schemas_fields_retrieve
+      parameters:
+        - in: path
+          name: schema_id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: No response body
+  /api/v1/temp-token/{id}/:
+    post:
+      operationId: api_v1_temp_token_create
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: No response body
+  /api/v1/users/:
+    get:
+      operationId: api_v1_users_list
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedUserList"
+          description: ""
+    post:
+      operationId: api_v1_users_create
+      description: API endpoint that allows users to be viewed or edited.
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/User"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/User"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+          description: ""
+  /api/v1/users/{id}/:
+    get:
+      operationId: api_v1_users_retrieve
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this user.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+          description: ""
+    put:
+      operationId: api_v1_users_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this user.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/User"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/User"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+          description: ""
+    patch:
+      operationId: api_v1_users_partial_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this user.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedUser"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedUser"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedUser"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+          description: ""
+    delete:
+      operationId: api_v1_users_destroy
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          description: A unique integer value identifying this user.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /api/v1/workflow/:
+    get:
+      operationId: api_v1_workflow_list
+      parameters:
+        - name: page
+          required: false
+          in: query
+          description: A page number within the paginated result set.
+          schema:
+            type: integer
+        - name: page_size
+          required: false
+          in: query
+          description: Number of results to return per page.
+          schema:
+            type: integer
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedWorkflowTemplateList"
+          description: ""
+    post:
+      operationId: api_v1_workflow_create
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowTemplate"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/WorkflowTemplate"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/WorkflowTemplate"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTemplate"
+          description: ""
+  /api/v1/workflow/{entity_type}/{entity_id}/:
+    get:
+      operationId: api_v1_workflow_retrieve
+      description: |-
+        Retrieve workflows that can be run on a specific entity.
+        Usage: /api/v1/workflow/{entity_type}/{entity_id}/
+        where entity_type is one of: project, dataset, experiment
+      parameters:
+        - in: path
+          name: entity_id
+          schema:
+            type: string
+          required: true
+        - in: path
+          name: entity_type
+          schema:
+            type: string
+            pattern: ^project|dataset|experiment$
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTemplate"
+          description: ""
+  /api/v1/workflow/{id}/:
+    get:
+      operationId: api_v1_workflow_retrieve_2
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this workflowtemplate.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTemplate"
+          description: ""
+    put:
+      operationId: api_v1_workflow_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this workflowtemplate.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowTemplate"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/WorkflowTemplate"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/WorkflowTemplate"
+        required: true
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTemplate"
+          description: ""
+    patch:
+      operationId: api_v1_workflow_partial_update
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this workflowtemplate.
+          required: true
+      tags:
+        - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchedWorkflowTemplate"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PatchedWorkflowTemplate"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PatchedWorkflowTemplate"
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTemplate"
+          description: ""
+    delete:
+      operationId: api_v1_workflow_destroy
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          description: A UUID string identifying this workflowtemplate.
+          required: true
+      tags:
+        - api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /datacite-api/v1/dois/:
+    get:
+      operationId: datacite_api_v1_dois_retrieve
+      tags:
+        - datacite-api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: No response body
+    post:
+      operationId: datacite_api_v1_dois_create
+      tags:
+        - datacite-api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: No response body
+    put:
+      operationId: datacite_api_v1_dois_update
+      tags:
+        - datacite-api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: No response body
+    delete:
+      operationId: datacite_api_v1_dois_destroy
+      tags:
+        - datacite-api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "204":
+          description: No response body
+  /onedata-api/v1/files/:
+    get:
+      operationId: onedata_api_v1_files_retrieve
+      tags:
+        - onedata-api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+        - {}
+      responses:
+        "200":
+          description: No response body
+    post:
+      operationId: onedata_api_v1_files_create
+      tags:
+        - onedata-api
+      security:
+        - knoxApiToken: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: No response body
+components:
+  schemas:
+    BaseModel:
+      type: object
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+        created_by:
+          allOf:
+            - $ref: "#/components/schemas/UserSerializerMinimal"
+          readOnly: true
+      required:
+        - created_by
+        - id
+        - name
+    BlankEnum:
+      enum:
+        - ""
+    Dataset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        metadata: {}
+        onedata_file_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        onedata_share_id:
+          type: string
+          nullable: true
+          title: Onedata Default Share ID
+          maxLength: 512
+        onedata_dataset_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        doi:
+          type: string
+          nullable: true
+          maxLength: 50
+        reservationId:
+          type: string
+          nullable: true
+          title: Reservation ID
+          maxLength: 50
+        status:
+          $ref: "#/components/schemas/Status86cEnum"
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        project:
+          type: string
+          format: uuid
+        schema:
+          type: string
+          format: uuid
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - created
+        - created_by
+        - description
+        - id
+        - modified
+        - modified_by
+        - name
+        - project
+    DatasetResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_by:
+          allOf:
+            - $ref: "#/components/schemas/UserSerializerMinimal"
+          readOnly: true
+        perms:
+          type: string
+          readOnly: true
+        shares:
+          type: string
+          readOnly: true
+        project:
+          allOf:
+            - $ref: "#/components/schemas/BaseModel"
+          readOnly: true
+        experiments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Experiment"
+          readOnly: true
+        dataset_schema:
+          allOf:
+            - $ref: "#/components/schemas/BaseModel"
+          readOnly: true
+        modified_by:
+          allOf:
+            - $ref: "#/components/schemas/UserSerializerMinimal"
+          readOnly: true
+        onedata_visit_id:
+          type: string
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        description:
+          type: string
+          maxLength: 500
+        metadata: {}
+        onedata_file_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        onedata_share_id:
+          type: string
+          nullable: true
+          title: Onedata Default Share ID
+          maxLength: 512
+        onedata_dataset_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        doi:
+          type: string
+          nullable: true
+          maxLength: 50
+        reservationId:
+          type: string
+          nullable: true
+          title: Reservation ID
+          maxLength: 50
+        status:
+          $ref: "#/components/schemas/Status86cEnum"
+        schema:
+          type: string
+          format: uuid
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - created
+        - created_by
+        - dataset_schema
+        - description
+        - experiments
+        - id
+        - modified
+        - modified_by
+        - name
+        - onedata_visit_id
+        - perms
+        - project
+        - shares
+    DefaultDataRowsEnum:
+      enum:
+        - 25
+        - 50
+        - 100
+        - 250
+      type: integer
+      description: |-
+        * `25` - Value1
+        * `50` - Value2
+        * `100` - Value3
+        * `250` - Value4
+    DefaultLangEnum:
+      enum:
+        - cs-CZ
+        - en-US
+      type: string
+      description: |-
+        * `cs-CZ` - Czech
+        * `en-US` - English
+    DefaultThemeEnum:
+      enum:
+        - dark
+        - light
+        - system
+      type: string
+      description: |-
+        * `dark` - Dark
+        * `light` - Light
+        * `system` - System
+    Experiment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        start_time:
+          type: string
+          format: date-time
+          nullable: true
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        note:
+          type: string
+          maxLength: 500
+        status:
+          $ref: "#/components/schemas/ExperimentStatusEnum"
+        onedata_file_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        dataset:
+          type: string
+          format: uuid
+      required:
+        - created
+        - created_by
+        - dataset
+        - id
+        - modified
+        - modified_by
+    ExperimentStatusEnum:
+      enum:
+        - new
+        - prepared
+        - running
+        - synchronizing
+        - success
+        - failure
+        - discarded
+      type: string
+      description: |-
+        * `new` - NEW
+        * `prepared` - PREPARED
+        * `running` - RUNNING
+        * `synchronizing` - SYNCHRONIZING
+        * `success` - SUCCESS
+        * `failure` - FAILURE
+        * `discarded` - DISCARDED
+    Facility:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        perms:
+          type: string
+          readOnly: true
+        shares:
+          type: string
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        abbreviation:
+          type: string
+          maxLength: 20
+        web:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        email:
+          oneOf:
+            - type: string
+              format: email
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        logo:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        onedata_token:
+          type: string
+          title: Onedata Secret token
+          maxLength: 512
+        onedata_provider_url:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+        - abbreviation
+        - created
+        - created_by
+        - id
+        - modified
+        - modified_by
+        - name
+        - perms
+        - shares
+    FacilitySerializerMinimal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        abbreviation:
+          type: string
+          maxLength: 20
+        email:
+          oneOf:
+            - type: string
+              format: email
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        web:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        logo:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+      required:
+        - abbreviation
+        - id
+        - name
+    Group:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+      required:
+        - name
+    Instrument:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        support:
+          type: string
+          maxLength: 500
+        contact:
+          type: string
+          maxLength: 500
+        method:
+          type: string
+          maxLength: 500
+        facility:
+          allOf:
+            - $ref: "#/components/schemas/FacilitySerializerMinimal"
+          readOnly: true
+        default_data_dir:
+          type: string
+          title: Default data directory
+          maxLength: 1024
+      required:
+        - contact
+        - facility
+        - id
+        - method
+        - name
+        - support
+    Job:
+      type: object
+      properties:
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        workflow_template:
+          type: string
+          format: uuid
+        root_resource_content_type:
+          type: integer
+          nullable: true
+          description: Content type of the related object (Project, Dataset, or Experiment)
+        root_resource_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the related object (Project, Dataset, or Experiment)
+        output_resource_content_type:
+          type: integer
+          nullable: true
+          description: Content type of the related object (Dataset or Experiment)
+        output_resource_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the related object (Dataset or Experiment)
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          readOnly: true
+        app_config:
+          title: App config json
+        start_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        end_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        log_level:
+          oneOf:
+            - $ref: "#/components/schemas/LogLevelEnum"
+            - $ref: "#/components/schemas/BlankEnum"
+      required:
+        - created
+        - created_by
+        - end_time
+        - id
+        - modified
+        - modified_by
+        - name
+        - start_time
+        - status
+        - workflow_template
+    LogLevelEnum:
+      enum:
+        - debug
+        - info
+        - warning
+      type: string
+      description: |-
+        * `debug` - DEBUG
+        * `info` - INFO
+        * `warning` - WARNING
+    PaginatedDatasetResponseList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatasetResponse"
+    PaginatedExperimentList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Experiment"
+    PaginatedFacilityList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Facility"
+    PaginatedGroupList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Group"
+    PaginatedInstrumentList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Instrument"
+    PaginatedJobList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Job"
+    PaginatedProfileList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Profile"
+    PaginatedProjectResponseList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectResponse"
+    PaginatedSchemaList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Schema"
+    PaginatedUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+    PaginatedWorkflowTemplateList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowTemplate"
+    PatchedDataset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        metadata: {}
+        onedata_file_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        onedata_share_id:
+          type: string
+          nullable: true
+          title: Onedata Default Share ID
+          maxLength: 512
+        onedata_dataset_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        doi:
+          type: string
+          nullable: true
+          maxLength: 50
+        reservationId:
+          type: string
+          nullable: true
+          title: Reservation ID
+          maxLength: 50
+        status:
+          $ref: "#/components/schemas/Status86cEnum"
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        project:
+          type: string
+          format: uuid
+        schema:
+          type: string
+          format: uuid
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+            format: uuid
+    PatchedExperiment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        start_time:
+          type: string
+          format: date-time
+          nullable: true
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        note:
+          type: string
+          maxLength: 500
+        status:
+          $ref: "#/components/schemas/ExperimentStatusEnum"
+        onedata_file_id:
+          type: string
+          nullable: true
+          maxLength: 512
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        dataset:
+          type: string
+          format: uuid
+    PatchedFacility:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        perms:
+          type: string
+          readOnly: true
+        shares:
+          type: string
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        abbreviation:
+          type: string
+          maxLength: 20
+        web:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        email:
+          oneOf:
+            - type: string
+              format: email
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        logo:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        onedata_token:
+          type: string
+          title: Onedata Secret token
+          maxLength: 512
+        onedata_provider_url:
+          oneOf:
+            - type: string
+              format: uri
+              maxLength: 200
+            - type: string
+              maxLength: 0
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+    PatchedGroup:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+    PatchedInstrument:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        support:
+          type: string
+          maxLength: 500
+        contact:
+          type: string
+          maxLength: 500
+        method:
+          type: string
+          maxLength: 500
+        facility:
+          allOf:
+            - $ref: "#/components/schemas/FacilitySerializerMinimal"
+          readOnly: true
+        default_data_dir:
+          type: string
+          title: Default data directory
+          maxLength: 1024
+    PatchedJob:
+      type: object
+      properties:
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        workflow_template:
+          type: string
+          format: uuid
+        root_resource_content_type:
+          type: integer
+          nullable: true
+          description: Content type of the related object (Project, Dataset, or Experiment)
+        root_resource_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the related object (Project, Dataset, or Experiment)
+        output_resource_content_type:
+          type: integer
+          nullable: true
+          description: Content type of the related object (Dataset or Experiment)
+        output_resource_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the related object (Dataset or Experiment)
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          readOnly: true
+        app_config:
+          title: App config json
+        start_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        end_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        log_level:
+          oneOf:
+            - $ref: "#/components/schemas/LogLevelEnum"
+            - $ref: "#/components/schemas/BlankEnum"
+    PatchedProfile:
+      type: object
+      properties:
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        default_data_rows:
+          allOf:
+            - $ref: "#/components/schemas/DefaultDataRowsEnum"
+          minimum: -2147483648
+          maximum: 2147483647
+        any_datasets:
+          type: string
+          readOnly: true
+        any_facilities:
+          type: string
+          readOnly: true
+        any_projects:
+          type: string
+          readOnly: true
+        app_version:
+          type: string
+          readOnly: true
+        avatar:
+          type: string
+          readOnly: true
+        last_login:
+          type: string
+          readOnly: true
+        default_theme:
+          $ref: "#/components/schemas/DefaultThemeEnum"
+        default_lang:
+          $ref: "#/components/schemas/DefaultLangEnum"
+    PatchedProject:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        onedata_space_id:
+          type: string
+          maxLength: 200
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        facility:
+          type: string
+          format: uuid
+        default_dataset_schema:
+          type: string
+          format: uuid
+          nullable: true
+        workflow_templates:
+          type: array
+          items:
+            type: string
+            format: uuid
+    PatchedSchema:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        version:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          default: 1
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+          maxLength: 500
+        schema: {}
+        uischema: {}
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+    PatchedUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description:
+            Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Email address
+          oneOf:
+            - type: string
+              format: email
+              maxLength: 254
+            - type: string
+              maxLength: 0
+        groups:
+          type: array
+          items:
+            type: integer
+          description:
+            The groups this user belongs to. A user will get all permissions
+            granted to each of their groups.
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        name:
+          type: string
+          readOnly: true
+    PatchedWorkflowTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        onedata_workflow_id:
+          type: string
+          maxLength: 200
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        revision:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,0})?$
+        input_params:
+          title: JSON
+        workflow_type:
+          $ref: "#/components/schemas/WorkflowTypeEnum"
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+    Profile:
+      type: object
+      properties:
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        default_data_rows:
+          allOf:
+            - $ref: "#/components/schemas/DefaultDataRowsEnum"
+          minimum: -2147483648
+          maximum: 2147483647
+        any_datasets:
+          type: string
+          readOnly: true
+        any_facilities:
+          type: string
+          readOnly: true
+        any_projects:
+          type: string
+          readOnly: true
+        app_version:
+          type: string
+          readOnly: true
+        avatar:
+          type: string
+          readOnly: true
+        last_login:
+          type: string
+          readOnly: true
+        default_theme:
+          $ref: "#/components/schemas/DefaultThemeEnum"
+        default_lang:
+          $ref: "#/components/schemas/DefaultLangEnum"
+      required:
+        - any_datasets
+        - any_facilities
+        - any_projects
+        - app_version
+        - avatar
+        - created
+        - last_login
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        onedata_space_id:
+          type: string
+          maxLength: 200
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        facility:
+          type: string
+          format: uuid
+        default_dataset_schema:
+          type: string
+          format: uuid
+          nullable: true
+        workflow_templates:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - created
+        - created_by
+        - description
+        - facility
+        - id
+        - modified
+        - modified_by
+        - name
+    ProjectResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_by:
+          allOf:
+            - $ref: "#/components/schemas/UserSerializerMinimal"
+          readOnly: true
+        perms:
+          type: string
+          readOnly: true
+        shares:
+          type: string
+          readOnly: true
+        facility:
+          allOf:
+            - $ref: "#/components/schemas/FacilitySerializerMinimal"
+          readOnly: true
+        default_dataset_schema:
+          allOf:
+            - $ref: "#/components/schemas/BaseModel"
+          readOnly: true
+        project_schema:
+          allOf:
+            - $ref: "#/components/schemas/BaseModel"
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        description:
+          type: string
+          maxLength: 500
+        onedata_space_id:
+          type: string
+          maxLength: 200
+        modified_by:
+          type: integer
+          nullable: true
+        workflow_templates:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - created
+        - created_by
+        - default_dataset_schema
+        - description
+        - facility
+        - id
+        - modified
+        - name
+        - perms
+        - project_schema
+        - shares
+    Reservation:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        from_date:
+          type: string
+          format: date-time
+        to_date:
+          type: string
+          format: date-time
+        user:
+          type: string
+        description:
+          type: string
+        project_id:
+          type: string
+        dataset_status:
+          type: string
+          nullable: true
+          readOnly: true
+      required:
+        - dataset_status
+        - description
+        - from_date
+        - id
+        - name
+        - project_id
+        - to_date
+        - user
+    Schema:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        version:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          default: 1
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+          maxLength: 500
+        schema: {}
+        uischema: {}
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+        - created
+        - created_by
+        - id
+        - modified
+        - modified_by
+        - name
+    Status86cEnum:
+      enum:
+        - new
+        - finished
+      type: string
+      description: |-
+        * `new` - NEW
+        * `finished` - FINISHED
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description:
+            Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Email address
+          oneOf:
+            - type: string
+              format: email
+              maxLength: 254
+            - type: string
+              maxLength: 0
+        groups:
+          type: array
+          items:
+            type: integer
+          description:
+            The groups this user belongs to. A user will get all permissions
+            granted to each of their groups.
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        name:
+          type: string
+          readOnly: true
+      required:
+        - id
+        - name
+        - username
+    UserSerializerMinimal:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+      required:
+        - full_name
+        - id
+    WorkflowTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+        onedata_workflow_id:
+          type: string
+          maxLength: 200
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        revision:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,0})?$
+        input_params:
+          title: JSON
+        workflow_type:
+          $ref: "#/components/schemas/WorkflowTypeEnum"
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        modified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+        - created
+        - created_by
+        - id
+        - modified
+        - modified_by
+        - onedata_workflow_id
+    WorkflowTypeEnum:
+      enum:
+        - WriteData
+        - Readonly
+        - In-placeChange
+        - Export
+      type: string
+      description: |-
+        * `WriteData` - WRITE_DATA
+        * `Readonly` - READONLY
+        * `In-placeChange` - IN_PLACE_CHANGE
+        * `Export` - EXPORT
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    knoxApiToken:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"
