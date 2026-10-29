@@ -15,7 +15,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
-from api.models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate
+from django.conf import settings
+from api.models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate, OnedataSyncState
 from api.serializers import (
     JobSerializer,
     UserSerializer,
@@ -28,7 +29,9 @@ from api.serializers import (
     ReservationSerializer,
     InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer,
     ProjectResponseSerializer,
-    WorkflowTemplateSerializer
+    WorkflowTemplateSerializer,
+    OnedataLinkSerializer,
+    OnedataLinkResponseSerializer,
 )
 from ..permissions import NestedPerms, update_perms, SameUser
 from rest_framework.exceptions import PermissionDenied
@@ -40,6 +43,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, delete_entry, create_new_experiment, create_new_temp_token, get_file_metadata, verify_job, verify_workflow_template, verify_workflow_existence
+from onedata_api.acl import apply_dataset_acl
+from onedata_api.onezone import OnezoneClient, OnedataError
+from onedata_api.sync import mark_pending, join_user_groups
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +60,40 @@ class ProfileViewSet(viewsets.ModelViewSet):
     def get_object(self):
         queryset = self.get_queryset()
         return queryset.get(user=self.request.user.id)
-     
+
+    @extend_schema(request=OnedataLinkSerializer, responses=OnedataLinkResponseSerializer)
+    @action(detail=False, methods=['post'], url_path='onedata-link')
+    def onedata_link(self, request, *args, **kwargs):
+        """
+        Links the user's Onedata account using a short-lived Onedata access token.
+        In invite mode the token is also used to join the user's Onedata groups. The token is never stored.
+        """
+        
+        serializer = OnedataLinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data["token"].strip()
+
+        try:
+            onedata_user_id = OnezoneClient().whoami(token)
+        except Exception as e:
+            logger.warning(f"Onedata account link failed for user {request.user.id}: {e}")
+            if isinstance(e, OnedataError) and e.status < 500:
+                return Response({"error": "The Onedata token is invalid or expired."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Onedata is not available, please try again later."}, status=status.HTTP_502_BAD_GATEWAY)
+
+        UserProfile.objects.filter(user=request.user).update(onedata_user_id=onedata_user_id)
+        mark_pending(PermsGroup.objects.filter(user=request.user).values_list("object_id", flat=True))
+
+        joined, failed = [], []
+        if settings.ONEDATA_SYNC_ENABLED and settings.ONEDATA_MEMBERSHIP_MODE == "invite":
+            joined, failed = join_user_groups(request.user, token)
+
+        return Response(OnedataLinkResponseSerializer({
+            "onedata_user_id": onedata_user_id,
+            "joined_groups": joined,
+            "failed_groups": failed,
+        }).data)
+
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -138,9 +177,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         
     def perform_update(self, serializer):
         
+        serializer.save()
+        # perms are updated after save so the Onedata sync status set by update_perms is not overwritten
         if Project.objects.get(id=self.kwargs.get('pk')).perm_atleast(self.request, PermsGroup.OWNER):
             update_perms(self.kwargs.get('pk'), self.request)
-        serializer.save()
     
 @extend_schema(
     request=DatasetSerializer,
@@ -180,9 +220,10 @@ class DatasetViewSet(viewsets.ModelViewSet):
     
     def perform_update(self, serializer):
         
+        serializer.save()
+        # perms are updated after save so the Onedata sync status set by update_perms is not overwritten
         if Dataset.objects.get(id=self.kwargs.get('pk')).perm_atleast(self.request, PermsGroup.OWNER):
             update_perms(self.kwargs.get('pk'), self.request)
-        serializer.save()
 
     def update(self, request, *args, **kwargs):
         serializer = DatasetSerializer(data=request.data)
@@ -219,8 +260,19 @@ class DatasetViewSet(viewsets.ModelViewSet):
         # Returns dataset id
         datasetId, err_dataset = establish_dataset(project, folder)
         request.data["onedata_dataset_id"] = datasetId
-        
-        return super().create(request, *args, **kwargs)
+
+        response = super().create(request, *args, **kwargs)
+
+        if settings.ONEDATA_SYNC_ENABLED:
+            # close the access window before the reconciler adds the dataset group, failures are retried by it
+            dataset = Dataset.objects.select_related("project__facility").get(id=response.data["id"])
+            try:
+                apply_dataset_acl(dataset)
+            except Exception as e:
+                logger.warning(f"Failed to set Onedata ACL for dataset {dataset.id}: {e}")
+                Dataset.objects.filter(id=dataset.id).update(onedata_sync_status=OnedataSyncState.ERROR, onedata_sync_error=str(e)[:2000])
+
+        return response
     
     @action(detail=False, methods=['post'])
     def create_public_share(self, request, *args, **kwargs):
@@ -468,6 +520,8 @@ class TempTokenAPIView(APIView):
         facility = project.facility
 
         token, error = create_new_temp_token(facility, project, dataset)
+        if error:
+            return Response(error, status=status.HTTP_502_BAD_GATEWAY)
 
         # Serialize the filtered data
         data = {

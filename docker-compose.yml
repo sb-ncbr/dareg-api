@@ -50,7 +50,7 @@ services:
       # List of allowed hosts separated by spaces (e.g.: "localhost domain.xyz 10.0.0.1")
       # If set to "*" all hosts are allowed
       DJANGO_ALLOWED_HOSTS: "*"
-      DJANGO_ALLOWED_ORIGINS: "http://localhost:8083 http://localhost http://localhost:5000"
+      DJANGO_ALLOWED_ORIGINS: "http://localhost:8083 http://localhost http://localhost:5000 http://localhost:1420"
       # DB_HOST: postgres
       # DB_USER: postgres
       # DB_PASSWORD: pass123worD

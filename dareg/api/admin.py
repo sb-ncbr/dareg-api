@@ -32,6 +32,8 @@ from knox.models import AuthTokenManager
 from django.utils import timezone
 
 ONEZONE_HOST = 'onedata.e-infra.cz'
+# Onedata group ids stay editable so an existing group can be adopted, see onedata_api/sync.py
+ONEDATA_SYNC_READONLY_FIELDS = ('onedata_sync_status', 'onedata_sync_error', 'onedata_synced_at')
 logger = logging.getLogger(__name__)
 
 class TimeStampFilter(admin.SimpleListFilter):
@@ -132,7 +134,8 @@ class DatasetAdminInline(admin.TabularInline):
 class ProjectAdmin(BaseModelAdmin):
     list_display = ('name', 'facility', 'onedata_space_ids', 'created_by') + BaseModelAdmin.list_display
     search_fields = ('name', 'facility__name')
-    list_filter = ('facility', 'default_dataset_schema')
+    list_filter = ('facility', 'default_dataset_schema', 'onedata_sync_status')
+    readonly_fields = BaseModelAdmin.readonly_fields + ONEDATA_SYNC_READONLY_FIELDS
 
     def onedata_space_ids(self, obj):
         return format_html(f"<a href=\"https://{ONEZONE_HOST}/ozw/onezone/i#/onedata/spaces/{obj.onedata_space_id}\">{obj.onedata_space_id}</a>")
@@ -144,7 +147,8 @@ class ProjectAdmin(BaseModelAdmin):
 class DatasetAdmin(BaseModelAdmin):
     list_display = ('name', 'project', 'onedata_share_link', 'onedata_link') + BaseModelAdmin.list_display
     search_fields = ('name', 'description')
-    list_filter = ('project','project__facility', 'schema', TimeStampFilter)
+    list_filter = ('project','project__facility', 'schema', TimeStampFilter, 'onedata_sync_status')
+    readonly_fields = BaseModelAdmin.readonly_fields + ONEDATA_SYNC_READONLY_FIELDS + ('onedata_acl_hash',)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -236,6 +240,8 @@ class ExperimentAdmin(BaseModelAdmin):
 class FacilityAdmin(BaseModelAdmin):
     list_display = ('name', 'abbreviation', 'has_onedata_token', 'has_onedata_provider') + BaseModelAdmin.list_display
     search_fields = ('name', 'abbreviation')
+    list_filter = ('onedata_sync_status',)
+    readonly_fields = BaseModelAdmin.readonly_fields + ONEDATA_SYNC_READONLY_FIELDS + ('onedata_user_id',)
     inlines = [ProjectAdminInline, InstrumentAdminInline]
 
     def has_onedata_token(self, obj):
@@ -280,9 +286,11 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     extra = 0
     fk_name = 'user'
+    readonly_fields = ('onedata_user_id',)
 
 class UserProfileAdmin(BaseModelAdmin):
     list_display = ('avatar', 'full_name', 'last_login') + BaseModelAdmin.list_display
+    readonly_fields = BaseModelAdmin.readonly_fields + ('onedata_user_id',)
 
     def avatar(self, obj):
         return format_html('<img src="{}" width="32px" style="background: #E3E3E3;padding: 1px;"/>'.format(obj.avatar))

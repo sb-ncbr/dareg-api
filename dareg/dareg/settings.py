@@ -39,6 +39,19 @@ JOB_ENGINE_POLL_LIMIT = int(os.environ.get("JOB_ENGINE_POLL_LIMIT", 20))
 # Job loop interval in seconds for job scheduler
 JOB_LOOP_INTERVAL = int(os.environ.get("JOB_LOOP_INTERVAL", 60))
 
+# Onedata access control (groups + ACLs)
+ONEDATA_SYNC_ENABLED = os.environ.get("ONEDATA_SYNC_ENABLED", "false").lower() == "true"
+ONEDATA_ONEZONE_URL = os.environ.get("ONEDATA_ONEZONE_URL", "https://onedata.e-infra.cz/api/v3/onezone")
+ONEDATA_ONEZONE_GUI_URL = os.environ.get("ONEDATA_ONEZONE_GUI_URL", "https://onedata.e-infra.cz/ozw/onezone/i")
+ONEDATA_SERVICE_TOKEN = os.environ.get("ONEDATA_SERVICE_TOKEN", "")
+ONEDATA_SERVICE_USER_ID = os.environ.get("ONEDATA_SERVICE_USER_ID", "")
+ONEDATA_ROOT_GROUP_ID = os.environ.get("ONEDATA_ROOT_GROUP_ID", "")
+ONEDATA_ADMINS_GROUP_ID = os.environ.get("ONEDATA_ADMINS_GROUP_ID", "")
+ONEDATA_SYNC_EVERY_N_CYCLES = int(os.environ.get("ONEDATA_SYNC_EVERY_N_CYCLES", 1))
+ONEDATA_FULL_PASS_EVERY_N = int(os.environ.get("ONEDATA_FULL_PASS_EVERY_N", 10))
+# "invite" (user joins via invite token at link time) | "direct" (needs oz_* admin privileges)
+ONEDATA_MEMBERSHIP_MODE = os.environ.get("ONEDATA_MEMBERSHIP_MODE", "invite")
+
 # Application definition
 
 INSTALLED_APPS = [

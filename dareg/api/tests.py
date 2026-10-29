@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from knox.models import AuthToken
 from django.utils.timezone import now, timedelta
 from api.models import Facility, Project, Dataset, Experiment, Instrument
+from onedata_api.middleware import create_new_temp_token
 from unittest.mock import patch, MagicMock
 from uuid import uuid4
 
@@ -78,6 +79,7 @@ class TempTokenAPIViewTest(APITestCase):
 
         # Create Project
         self.project = Project.objects.create(name="Test Project", facility=self.facility, description="desc",
+                                              onedata_space_id="space123",
                                               created_by=self.user)
 
         # Create Dataset
@@ -94,7 +96,7 @@ class TempTokenAPIViewTest(APITestCase):
 
         self.url = f"/api/v1/temp-token/{self.experiment.id}/"
 
-    @patch("api.views.create_new_temp_token")
+    @patch("api.views.views.create_new_temp_token")
     def test_temp_token_success(self, mock_create_token):
         mock_create_token.return_value = ("mocked-token-xyz", None)
 
@@ -107,6 +109,35 @@ class TempTokenAPIViewTest(APITestCase):
         self.assertEqual(response.data["token"], "mocked-token-xyz")
         self.assertEqual(response.data["provider_url"], self.facility.onedata_provider_url)
         self.assertEqual(response.data["one_data_directory_id"], self.experiment.onedata_file_id)
+
+    @patch("onedata_api.middleware.requests.post")
+    def test_create_temp_token_uses_provider_endpoint(self, mock_post):
+        response = MagicMock(status_code=201)
+        response.json.return_value = {"token": "provider-temporary-token"}
+        mock_post.return_value = response
+
+        token, error = create_new_temp_token(self.facility, self.project, self.dataset)
+
+        self.assertEqual(token, "provider-temporary-token")
+        self.assertIsNone(error)
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        url = args[0]
+        self.assertEqual(url, "https://onedata.e-infra.cz/api/v3/onezone/provider/tokens/temporary")
+        self.assertEqual(kwargs["json"]["type"], {"accessToken": {}})
+        self.assertEqual(kwargs["json"]["caveats"][1]["type"], "data.path")
+
+    @patch("api.views.views.create_new_temp_token")
+    def test_temp_token_upstream_error_is_returned(self, mock_create_token):
+        mock_create_token.return_value = (None, {"error": "OneData request failed."})
+
+        response = self.client.post(
+            self.url,
+            HTTP_AUTHORIZATION=self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(response.data["error"], "OneData request failed.")
 
     def test_requires_authentication(self):
         response = self.client.post(self.url)

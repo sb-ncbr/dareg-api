@@ -220,6 +220,7 @@ def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset
     oneprovider_configuration.api_key['X-Auth-Token'] = facility.onedata_token
     error = None
     token = None
+    response = None
     try:
         print(f"Create temp token", flush=True)
         #TODO: configurable url
@@ -248,9 +249,14 @@ def create_new_temp_token(facility: Facility, project: Project, dataset: Dataset
         print(response.status_code, response.text, flush=True)
         if response.status_code == 201:
             token = response.json().get("token")
+            if not token:
+                error = {"error": "OneData did not return a temporary token."}
+        else:
+            error = {"error": f"OneData temporary-token request failed with HTTP {response.status_code}."}
+            print(response.text, flush=True)
     except Exception as e:
-        error = {"error": f"Failed to set permissions for the dataset. {e} {response.text}"}
-        print(f"Failed to set permissions for the dataset. {e} {response.text}", flush=True)
+        error = {"error": f"Failed to create a temporary token. {e}"}
+        print(f"Failed to create a temporary token. {e}", flush=True)
 
     return token, error
 

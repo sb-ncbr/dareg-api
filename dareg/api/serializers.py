@@ -7,6 +7,9 @@ from jsonschema import Draft7Validator, SchemaError
 from .models import Facility, Job, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
     ExperimentStatus, WorkflowTemplate
 
+# Managed by the Onedata reconciler (onedata_api/sync.py), never writable through the API
+ONEDATA_SYNC_FIELDS = ["onedata_group_id", "onedata_sync_status", "onedata_sync_error", "onedata_synced_at"]
+
 
 class UserSerializerMinimal(serializers.ModelSerializer):
 
@@ -95,7 +98,18 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects", "app_version", "avatar", "last_login", "default_theme", "default_lang"]
+        fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects", "app_version", "avatar", "last_login", "default_theme", "default_lang", "onedata_user_id"]
+        read_only_fields = ["onedata_user_id"]
+
+
+class OnedataLinkSerializer(serializers.Serializer):
+    token = serializers.CharField(write_only=True)
+
+
+class OnedataLinkResponseSerializer(serializers.Serializer):
+    onedata_user_id = serializers.CharField()
+    joined_groups = serializers.ListField(child=serializers.CharField())
+    failed_groups = serializers.ListField(child=serializers.DictField())
 
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -108,7 +122,7 @@ class FacilitySerializer(serializers.ModelSerializer, PermsModelSerializer):
     class Meta:
         model = Facility
         fields = "__all__"
-        read_only_fields = ["created_by", "modified_by"]
+        read_only_fields = ["created_by", "modified_by", "onedata_staff_group_id", "onedata_user_id"] + ONEDATA_SYNC_FIELDS
     
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
@@ -147,7 +161,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = "__all__"
-        read_only_fields = ["id", "created_by", "modified_by"]
+        read_only_fields = ["id", "created_by", "modified_by", "onedata_managers_group_id"] + ONEDATA_SYNC_FIELDS
 
     def to_representation(self, data):
         """Serialize the facility as a nested object."""
@@ -186,6 +200,13 @@ class DatasetResponseSerializer(BaseModelSerializer, serializers.ModelSerializer
 
     def get_onedata_visit_id(self, obj):
         return obj.onedata_visit_id
+
+    onedata_url = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_onedata_url(self, obj):
+        from onedata_api.onezone import onedata_gui_url
+        return onedata_gui_url(obj)
     
     class Meta:
         model = Dataset
@@ -196,7 +217,7 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = "__all__"
-        read_only_fields = ["id", "created_by", "modified_by"]
+        read_only_fields = ["id", "created_by", "modified_by", "onedata_acl_hash"] + ONEDATA_SYNC_FIELDS
 
     def to_representation(self, data):
         return DatasetResponseSerializer(context=self.context).to_representation(data)

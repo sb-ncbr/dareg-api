@@ -191,7 +191,25 @@ class PermsGroup(Group):
     def __str__(self):
         return f'{self.content_type.model_class()._meta.verbose_name.capitalize()} - {self.content_object} - {self.role}'
 
-class Facility(PermsObject):
+class OnedataSyncState(models.TextChoices):
+    PENDING = "pending"
+    OK = "ok"
+    ERROR = "error"
+
+class OnedataSyncMixin(models.Model):
+    """
+    State of the Onedata group/ACL reconciliation (see onedata_api/sync.py).
+    Empty onedata_group_id means the group was not created yet.
+    """
+    onedata_group_id = models.CharField("Onedata group ID", max_length=64, blank=True, default="")
+    onedata_sync_status = models.CharField("Onedata sync status", max_length=10, choices=OnedataSyncState.choices, default=OnedataSyncState.PENDING)
+    onedata_sync_error = models.TextField("Onedata sync error", blank=True, default="")
+    onedata_synced_at = models.DateTimeField("Onedata synced at", null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+class Facility(PermsObject, OnedataSyncMixin):
     name = models.CharField("Name", max_length=200, unique=True)
     abbreviation = models.CharField("Abbreviation", max_length=20, unique=True)
     web = models.URLField("Web", max_length=200, blank=True)
@@ -199,6 +217,8 @@ class Facility(PermsObject):
     logo = models.URLField("Logo", blank=True, max_length=200)
     onedata_token = models.CharField("Onedata Secret token", max_length=512, blank=True)
     onedata_provider_url = models.URLField("Onedata provider URL", max_length=200, blank=True)
+    onedata_staff_group_id = models.CharField("Onedata staff group ID", max_length=64, blank=True, default="")
+    onedata_user_id = models.CharField("Onedata user ID of the token owner", max_length=64, blank=True, default="")
 
     class Meta:
         verbose_name_plural = "Facilities"
@@ -239,7 +259,7 @@ class Schema(BaseModel):
             return f'{self.name} (v.{self.version})'
 
 
-class Project(PermsObject):
+class Project(PermsObject, OnedataSyncMixin):
     facility = models.ForeignKey(Facility, models.PROTECT)
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500)
@@ -252,6 +272,7 @@ class Project(PermsObject):
     )
     onedata_space_id = models.CharField("Onedata space ID", max_length=200, blank=True)
     workflow_templates = models.ManyToManyField('WorkflowTemplate', blank=True, related_name='supported_projects')
+    onedata_managers_group_id = models.CharField("Onedata managers group ID", max_length=64, blank=True, default="")
 
     trigram_search_fields = ["name", "description"]
 
@@ -278,7 +299,7 @@ class DatasetStatus(StrEnum):
     def choices(cls):
         return [(key.value, key.name) for key in cls]
 
-class Dataset(PermsObject):
+class Dataset(PermsObject, OnedataSyncMixin):
     project = models.ForeignKey(Project, models.PROTECT)
     name = models.CharField("Name", max_length=200)
     description = models.CharField("Description", max_length=500)
@@ -292,12 +313,21 @@ class Dataset(PermsObject):
     doi = models.CharField("DOI", max_length=50, null=True, blank=True)
     reservationId = models.CharField("Reservation ID", max_length=50, null=True, blank=True)
     status = models.CharField(choices=DatasetStatus.choices(), default=DatasetStatus.NEW, max_length=20)
+    onedata_acl_hash = models.CharField("Onedata ACL hash", max_length=64, blank=True, default="")
 
     trigram_search_fields = ["name", "description"]
 
     def __str__(self):
         return f'{self.name}'
-  
+
+    def save(self, *args, **kwargs):
+        # DOI controls anonymous access in the Onedata ACL
+        if not self._state.adding:
+            old_doi = Dataset.objects.filter(pk=self.pk).values_list("doi", flat=True).first()
+            if old_doi != self.doi:
+                self.onedata_sync_status = OnedataSyncState.PENDING
+        super().save(*args, **kwargs)
+
     @property
     def onedata_visit_id(self):
         space_id = self.onedata_space_id if self.onedata_space_id else self.project.onedata_space_id
@@ -370,6 +400,7 @@ class UserProfile(BaseModel):
     default_data_rows = models.IntegerField(choices=TableRowsOptions.choices, default=TableRowsOptions.VALUE1)
     default_theme = models.CharField(max_length=6, choices=THEME_CHOICES, default='light')
     default_lang = models.CharField(max_length=5, choices=LANG_CHOICES, default='en-US')
+    onedata_user_id = models.CharField("Onedata user ID", max_length=64, blank=True, default="")
 
     @property
     def app_version(self):
