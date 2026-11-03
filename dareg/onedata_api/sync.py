@@ -20,9 +20,11 @@ logger = logging.getLogger(__name__)
 
 ADVISORY_LOCK_ID = 7_301_966  # arbitrary, unique for this job
 MAX_ERRORS_PER_PASS = 10
+MAX_ORPHAN_REMOVALS_PER_PASS = 20
 SYNC_MODELS = (Facility, Project, Dataset)
 
 _pass_count = 0
+_orphan_removals = 0
 
 
 def mark_pending(object_ids):
@@ -80,6 +82,52 @@ def _sync_members(client: OnezoneClient, group_id: str, obj):
         client.remove_user_from_group(group_id, user_id)
 
 
+def _referenced_group_ids() -> set[str]:
+    group_ids = {settings.ONEDATA_ROOT_GROUP_ID, settings.ONEDATA_ADMINS_GROUP_ID}
+    for model, fields in (
+        (Facility, ("onedata_group_id", "onedata_staff_group_id")),
+        (Project, ("onedata_group_id", "onedata_managers_group_id")),
+        (Dataset, ("onedata_group_id",)),
+    ):
+        for field in fields:
+            group_ids.update(model.objects.values_list(field, flat=True))
+    return {g for g in group_ids if g}
+
+
+def _cleanup_children(client: OnezoneClient, parent_id: str) -> bool:
+    """Removes child groups no database row references. False when the per-pass limit stopped it."""
+
+    global _orphan_removals
+    mode = settings.ONEDATA_ORPHAN_CLEANUP
+    if mode == "off" or not parent_id:
+        return True
+    for child_id in client.list_child_groups(parent_id) - _referenced_group_ids():
+        if mode != "delete":
+            logger.warning(f"Onedata cleanup (report): unused group {child_id} under {parent_id} would be removed")
+            continue
+        if _orphan_removals >= MAX_ORPHAN_REMOVALS_PER_PASS:
+            logger.error("Onedata cleanup limit reached, remaining groups are removed in a later pass")
+            return False
+        # clean the child's own children first so they are not orphaned for good
+        try:
+            if not _cleanup_children(client, child_id):
+                return False
+        except OnedataError as e:
+            if e.status not in (403, 404):
+                raise
+        try:
+            client.delete_group(child_id)
+            action = "deleted"
+        except OnedataError as e:
+            if e.status != 403:
+                raise
+            client.remove_child_group(parent_id, child_id)
+            action = "detached"
+        _orphan_removals += 1
+        logger.info(f"Onedata cleanup: unused group {child_id} {action} from {parent_id}")
+    return True
+
+
 def sync_facility(client: OnezoneClient, facility: Facility, full: bool) -> bool:
     before = (facility.onedata_staff_group_id, facility.onedata_user_id)
     group_id = _ensure_group(client, facility, "onedata_group_id", _group_name("fac", facility.abbreviation), settings.ONEDATA_ROOT_GROUP_ID)
@@ -90,7 +138,7 @@ def sync_facility(client: OnezoneClient, facility: Facility, full: bool) -> bool
         Facility.objects.filter(id=facility.id).update(onedata_user_id=facility.onedata_user_id)
     if before != (facility.onedata_staff_group_id, facility.onedata_user_id):
         Dataset.objects.filter(project__facility=facility).update(onedata_sync_status=OnedataSyncState.PENDING)
-    return True
+    return _cleanup_children(client, group_id)
 
 
 def sync_project(client: OnezoneClient, project: Project, full: bool) -> bool:
@@ -108,7 +156,7 @@ def sync_project(client: OnezoneClient, project: Project, full: bool) -> bool:
     _sync_members(client, managers_id, project)
     if before != managers_id:
         Dataset.objects.filter(project=project).update(onedata_sync_status=OnedataSyncState.PENDING)
-    return True
+    return _cleanup_children(client, group_id)
 
 
 def sync_dataset(client: OnezoneClient, dataset: Dataset, full: bool) -> bool:
@@ -142,7 +190,7 @@ def _run(client: OnezoneClient, sync_fn, obj, full: bool) -> bool:
 def sync_onedata():
     """One reconciler pass, called from the job loop when ONEDATA_SYNC_ENABLED."""
 
-    global _pass_count
+    global _pass_count, _orphan_removals
     if not (settings.ONEDATA_SERVICE_TOKEN and settings.ONEDATA_SERVICE_USER_ID):
         # without the service user id the reconciler would remove the service account from its groups
         logger.error("Onedata sync is enabled but ONEDATA_SERVICE_TOKEN or ONEDATA_SERVICE_USER_ID is not set")
@@ -153,6 +201,7 @@ def sync_onedata():
             return
         full = _pass_count % max(settings.ONEDATA_FULL_PASS_EVERY_N, 1) == 0
         _pass_count += 1
+        _orphan_removals = 0
         client = OnezoneClient()
         errors = 0
         for model, sync_fn, related in (

@@ -65,6 +65,24 @@ class OnezoneClient:
     def add_child_group(self, parent_id: str, child_id: str):
         self._request("PUT", f"/groups/{parent_id}/children/{child_id}", ok_conflict=True)
 
+    def list_child_groups(self, group_id: str) -> set[str]:
+        return set(self._request("GET", f"/groups/{group_id}/children").json().get("groups", []))
+
+    def remove_child_group(self, parent_id: str, child_id: str):
+        try:
+            self._request("DELETE", f"/groups/{parent_id}/children/{child_id}")
+        except OnedataError as e:
+            if e.status != 404:
+                raise
+
+    def delete_group(self, group_id: str):
+        # 403 propagates, the caller falls back to remove_child_group
+        try:
+            self._request("DELETE", f"/groups/{group_id}")
+        except OnedataError as e:
+            if e.status != 404:
+                raise
+
     def list_group_users(self, group_id: str) -> set[str]:
         return set(self._request("GET", f"/groups/{group_id}/users").json().get("users", []))
 

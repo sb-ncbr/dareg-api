@@ -23,6 +23,7 @@ ONEDATA_SETTINGS = dict(
     ONEDATA_ADMINS_GROUP_ID="admins",
     ONEDATA_FULL_PASS_EVERY_N=10,
     ONEDATA_MEMBERSHIP_MODE="invite",
+    ONEDATA_ORPHAN_CLEANUP="report",
 )
 
 
@@ -35,6 +36,8 @@ class FakeOnezone:
         self.children = set()
         self.spaces = set()
         self.fail_names = set()
+        self.forbidden_deletes = set()
+        self.deleted = []
 
     def create_group(self, name):
         if name in self.fail_names:
@@ -51,6 +54,19 @@ class FakeOnezone:
 
     def add_child_group(self, parent_id, child_id):
         self.children.add((parent_id, child_id))
+
+    def list_child_groups(self, group_id):
+        return {child for parent, child in self.children if parent == group_id}
+
+    def remove_child_group(self, parent_id, child_id):
+        self.children.discard((parent_id, child_id))
+
+    def delete_group(self, group_id):
+        if group_id in self.forbidden_deletes:
+            raise OnedataError(403, "forbidden", "forbidden")
+        self.deleted.append(group_id)
+        self.groups.pop(group_id, None)
+        self.children = {(p, c) for p, c in self.children if group_id not in (p, c)}
 
     def list_group_users(self, group_id):
         return set(self.members[group_id])
@@ -200,6 +216,123 @@ class OnedataSyncTests(TestCase):
         update_perms(self.dataset.id, MagicMock(data={"shares": [{"id": self.user.id, "perms": "viewer"}]}))
         self.dataset.refresh_from_db()
         self.assertEqual(self.dataset.onedata_sync_status, OnedataSyncState.PENDING)
+
+
+@override_settings(**ONEDATA_SETTINGS)
+class OnedataOrphanCleanupTests(TestCase):
+    """Cleanup of child groups that no database row references."""
+
+    def setUp(self):
+        OnedataSyncTests.setUp(self)
+        sync.sync_onedata()
+        for obj in (self.facility, self.project, self.dataset):
+            obj.refresh_from_db()
+        self.prj_id = self.project.onedata_group_id
+
+    def _add_child(self, parent_id, child_id):
+        self.fake.groups[child_id] = child_id
+        self.fake.children.add((parent_id, child_id))
+
+    def _pass(self):
+        Project.objects.update(onedata_sync_status=OnedataSyncState.PENDING)
+        sync.sync_onedata()
+        self.project.refresh_from_db()
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="delete")
+    def test_delete_unused_child(self):
+        self._add_child(self.prj_id, "old-ds")
+        self._pass()
+        self.assertEqual(self.fake.deleted, ["old-ds"])
+        self.assertEqual(self.fake.list_child_groups(self.prj_id),
+                         {self.project.onedata_managers_group_id, self.dataset.onedata_group_id})
+        self.assertEqual(self.project.onedata_sync_status, OnedataSyncState.OK)
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="delete")
+    def test_forbidden_delete_detaches(self):
+        self._add_child(self.prj_id, "old-ds")
+        self.fake.forbidden_deletes.add("old-ds")
+        self._pass()
+        self.assertNotIn("old-ds", self.fake.list_child_groups(self.prj_id))
+        self.assertIn("old-ds", self.fake.groups)
+        self.assertEqual(self.project.onedata_sync_status, OnedataSyncState.OK)
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="report")
+    def test_report_mode_only_logs(self):
+        self._add_child(self.prj_id, "old-ds")
+        with patch.object(self.fake, "remove_child_group") as mock_remove, \
+                self.assertLogs("onedata_api.sync", "WARNING") as logs:
+            self._pass()
+        mock_remove.assert_not_called()
+        self.assertEqual(self.fake.deleted, [])
+        self.assertIn((self.prj_id, "old-ds"), self.fake.children)
+        self.assertIn("Onedata cleanup (report): unused group old-ds", "\n".join(logs.output))
+        self.assertEqual(self.project.onedata_sync_status, OnedataSyncState.OK)
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="off")
+    def test_off_mode_does_not_list_children(self):
+        with patch.object(self.fake, "list_child_groups") as mock_list:
+            self._pass()
+        mock_list.assert_not_called()
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="delete")
+    def test_child_referenced_by_other_object_is_kept(self):
+        self._add_child(self.prj_id, "other-ds")
+        other = Project.objects.create(name="Other", facility=self.facility, description="d", created_by=self.user)
+        Dataset.objects.create(name="Other", project=other, description="d", onedata_group_id="other-ds", created_by=self.user)
+        self._pass()
+        self.assertNotIn("other-ds", self.fake.deleted)
+        self.assertIn((self.prj_id, "other-ds"), self.fake.children)
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="delete")
+    def test_root_and_admins_groups_are_kept(self):
+        self._add_child(self.prj_id, "root")
+        self._add_child(self.prj_id, "admins")
+        self._pass()
+        self.assertEqual(self.fake.deleted, [])
+        self.assertTrue({(self.prj_id, "root"), (self.prj_id, "admins")} <= self.fake.children)
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="delete")
+    def test_removal_limit_per_pass(self):
+        for i in range(25):
+            self._add_child(self.prj_id, f"old-{i}")
+        self._pass()
+        self.assertEqual(len(self.fake.deleted), sync.MAX_ORPHAN_REMOVALS_PER_PASS)
+        self.assertEqual(self.project.onedata_sync_status, OnedataSyncState.PENDING)
+
+        sync.sync_onedata()
+        self.project.refresh_from_db()
+        self.assertEqual(len(self.fake.deleted), 25)
+        self.assertEqual(self.project.onedata_sync_status, OnedataSyncState.OK)
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="delete")
+    def test_children_removed_before_parent(self):
+        self._add_child(self.facility.onedata_group_id, "old-prj")
+        self._add_child("old-prj", "old-mgr")
+        Facility.objects.update(onedata_sync_status=OnedataSyncState.PENDING)
+        sync.sync_onedata()
+        self.assertEqual(self.fake.deleted, ["old-mgr", "old-prj"])
+
+    def test_delete_marks_parent_pending(self):
+        self.dataset.delete()
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.onedata_sync_status, OnedataSyncState.PENDING)
+
+        self.project.delete()
+        self.facility.refresh_from_db()
+        self.assertEqual(self.facility.onedata_sync_status, OnedataSyncState.PENDING)
+
+    @override_settings(ONEDATA_ORPHAN_CLEANUP="delete")
+    def test_list_children_error_marks_parent_error(self):
+        with patch.object(self.fake, "list_child_groups", side_effect=OnedataError(500, "internalServerError", "boom")):
+            Facility.objects.update(onedata_sync_status=OnedataSyncState.PENDING)
+            Dataset.objects.update(onedata_sync_status=OnedataSyncState.PENDING)
+            self._pass()
+        self.facility.refresh_from_db()
+        for obj in (self.facility, self.project):
+            self.assertEqual(obj.onedata_sync_status, OnedataSyncState.ERROR)
+            self.assertIn("boom", obj.onedata_sync_error)
+        self.dataset.refresh_from_db()
+        self.assertEqual(self.dataset.onedata_sync_status, OnedataSyncState.OK)
 
 
 @override_settings(**ONEDATA_SETTINGS)

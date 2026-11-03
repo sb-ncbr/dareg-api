@@ -341,6 +341,15 @@ class Dataset(PermsObject, OnedataSyncMixin):
     class Meta:
         unique_together = ("project", "name")
 
+# the reconciler of the parent removes the now unused Onedata groups (onedata_api/sync.py)
+@receiver(post_delete, sender=Dataset)
+def mark_project_pending(sender, instance, **kwargs):
+    Project.objects.filter(id=instance.project_id).update(onedata_sync_status=OnedataSyncState.PENDING)
+
+@receiver(post_delete, sender=Project)
+def mark_facility_pending(sender, instance, **kwargs):
+    Facility.objects.filter(id=instance.facility_id).update(onedata_sync_status=OnedataSyncState.PENDING)
+
 
 class ExperimentStatus(StrEnum):
     NEW = "new"

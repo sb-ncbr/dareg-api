@@ -51,6 +51,8 @@ ONEDATA_SYNC_EVERY_N_CYCLES = int(os.environ.get("ONEDATA_SYNC_EVERY_N_CYCLES", 
 ONEDATA_FULL_PASS_EVERY_N = int(os.environ.get("ONEDATA_FULL_PASS_EVERY_N", 10))
 # "invite" (user joins via invite token at link time) | "direct" (needs oz_* admin privileges)
 ONEDATA_MEMBERSHIP_MODE = os.environ.get("ONEDATA_MEMBERSHIP_MODE", "invite")
+# "off" | "report" (only log unused groups) | "delete" (remove them from Onedata)
+ONEDATA_ORPHAN_CLEANUP = os.environ.get("ONEDATA_ORPHAN_CLEANUP", "report")
 
 # Application definition
 
