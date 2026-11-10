@@ -16,8 +16,9 @@ def update_perms(id, request):
             group.user_set.add(user)
 
         # Onedata group membership follows DAREG perms
-        from onedata_api.sync import mark_pending
+        from onedata_api.sync import mark_pending, schedule_sync
         mark_pending([id])
+        schedule_sync([id])
 
 
 class NestedPerms(permissions.BasePermission):

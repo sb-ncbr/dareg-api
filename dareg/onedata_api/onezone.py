@@ -102,6 +102,10 @@ class OnezoneClient:
     def whoami(self, token: str) -> str:
         return self._request("GET", "/user", token=token).json()["userId"]
 
+    def list_user_groups(self, token: str) -> set[str]:
+        """Direct group memberships of the user that owns `token`."""
+        return set(self._request("GET", "/user/groups", token=token).json().get("groups", []))
+
     def create_group_invite_token(self, group_id: str, valid_minutes: int = 5) -> str:
         valid_until = int((datetime.now(timezone.utc) + timedelta(minutes=valid_minutes)).timestamp())
         response = self._request("POST", "/user/tokens/temporary", json={

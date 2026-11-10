@@ -1,8 +1,11 @@
 from contextlib import nullcontext
+import logging
 from unittest.mock import patch, MagicMock
 
+import requests
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from knox.models import AuthToken
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -431,53 +434,414 @@ class DatasetCreateAclTests(APITestCase):
         self.assertEqual(dataset.onedata_file_id, "folder-id")
 
 
-@override_settings(**ONEDATA_SETTINGS)
-class OnedataLinkTests(APITestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="user", password="x")
-        self.client.force_authenticate(user=self.user)
-        self.url = "/api/v1/profile/onedata-link/"
+# INVITE-MODE (disabled, replaced by auto-link)
+# @override_settings(**ONEDATA_SETTINGS)
+# class OnedataLinkTests(APITestCase):
+#     def setUp(self):
+#         self.user = User.objects.create_user(username="user", password="x")
+#         self.client.force_authenticate(user=self.user)
+#         self.url = "/api/v1/profile/onedata-link/"
+#
+#     @patch("api.views.views.join_user_groups")
+#     @patch("api.views.views.OnezoneClient")
+#     def test_link_stores_user_id_only(self, mock_client, mock_join):
+#         mock_client.return_value.whoami.return_value = "od-user"
+#
+#         response = self.client.post(self.url, {"token": "secret-token"}, format="json")
+#
+#         self.assertEqual(response.status_code, status.HTTP_200_OK)
+#         self.assertEqual(response.data["onedata_user_id"], "od-user")
+#         self.user.userprofile.refresh_from_db()
+#         self.assertEqual(self.user.userprofile.onedata_user_id, "od-user")
+#         self.assertNotIn("secret-token", str(response.data))
+#         mock_join.assert_not_called()  # sync flag is off
+#
+#     @patch("api.views.views.OnezoneClient")
+#     def test_invalid_token(self, mock_client):
+#         mock_client.return_value.whoami.side_effect = OnedataError(401, "tokenInvalid", "invalid")
+#         response = self.client.post(self.url, {"token": "bad"}, format="json")
+#         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+#
+#     def test_profile_onedata_user_id_is_read_only(self):
+#         self.client.patch("/api/v1/profile/", {"onedata_user_id": "spoofed"}, format="json")
+#         self.user.userprofile.refresh_from_db()
+#         self.assertEqual(self.user.userprofile.onedata_user_id, "")
 
-    @patch("api.views.views.join_user_groups")
-    @patch("api.views.views.OnezoneClient")
-    def test_link_stores_user_id_only(self, mock_client, mock_join):
-        mock_client.return_value.whoami.return_value = "od-user"
 
-        response = self.client.post(self.url, {"token": "secret-token"}, format="json")
+# INVITE-MODE (disabled, replaced by auto-link)
+# @override_settings(**ONEDATA_SETTINGS)
+# class JoinUserGroupsTests(TestCase):
+#     def test_joins_groups_of_user_perms(self):
+#         user = User.objects.create_user(username="owner", password="x")
+#         facility = Facility.objects.create(name="Fac", abbreviation="FAC", onedata_staff_group_id="staff", created_by=user)
+#         Project.objects.create(name="Proj", facility=facility, description="d", onedata_managers_group_id="mgr", created_by=user)
+#         viewer =User.objects.create_user(username="viewer", password="x")
+#         PermsGroup.objects.get(name=f"{facility.id}_viewer").user_set.add(viewer)
+#
+#         with patch("onedata_api.sync.OnezoneClient") as mock_client:
+#             client = mock_client.return_value
+#             client.create_group_invite_token.return_value = "invite"
+#             joined, failed = sync.join_user_groups(viewer, "user-token")
+#
+#         self.assertEqual(joined, ["staff"])
+#         self.assertEqual(failed, [])
+#         client.join_group.assert_called_once_with("user-token", "invite")
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["onedata_user_id"], "od-user")
-        self.user.userprofile.refresh_from_db()
-        self.assertEqual(self.user.userprofile.onedata_user_id, "od-user")
-        self.assertNotIn("secret-token", str(response.data))
-        mock_join.assert_not_called()  # sync flag is off
 
-    @patch("api.views.views.OnezoneClient")
-    def test_invalid_token(self, mock_client):
-        mock_client.return_value.whoami.side_effect = OnedataError(401, "tokenInvalid", "invalid")
-        response = self.client.post(self.url, {"token": "bad"}, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+BEARER = "test-bearer-token"
+NOT_ACCEPTED = "Onedata did not accept your e-infra login. If you have never used Onedata, log in once at https://onedata.e-infra.cz and then retry."
 
-    def test_profile_onedata_user_id_is_read_only(self):
-        self.client.patch("/api/v1/profile/", {"onedata_user_id": "spoofed"}, format="json")
-        self.user.userprofile.refresh_from_db()
-        self.assertEqual(self.user.userprofile.onedata_user_id, "")
+
+class LogCapture(logging.Handler):
+    def __init__(self):
+        super().__init__(logging.DEBUG)
+        self.messages = []
+
+    def emit(self, record):
+        self.messages.append(record.getMessage())
+
+
+UNAVAILABLE = "Onedata is not available, please try again later."
+ONEZONE_TOKEN = f"einfracz:{BEARER}"
+
+
+def fail_for(invite_token, error):
+    """join_group side effect that fails only for one invite token."""
+
+    def join_group(user_token, invite):
+        if invite == invite_token:
+            raise error
+    return join_group
 
 
 @override_settings(**ONEDATA_SETTINGS)
 class JoinUserGroupsTests(TestCase):
-    def test_joins_groups_of_user_perms(self):
-        user = User.objects.create_user(username="owner", password="x")
-        facility = Facility.objects.create(name="Fac", abbreviation="FAC", onedata_staff_group_id="staff", created_by=user)
-        Project.objects.create(name="Proj", facility=facility, description="d", onedata_managers_group_id="mgr", created_by=user)
-        viewer =User.objects.create_user(username="viewer", password="x")
-        PermsGroup.objects.get(name=f"{facility.id}_viewer").user_set.add(viewer)
+    def setUp(self):
+        self.user = User.objects.create_user(username="user", password="x")
+        facility = Facility.objects.create(name="Fac", abbreviation="FAC", onedata_staff_group_id="staff", created_by=self.user)
+        project = Project.objects.create(name="Proj", facility=facility, description="d", onedata_managers_group_id="mgr", created_by=self.user)
+        Project.objects.create(name="Empty", facility=facility, description="d", created_by=self.user)
+        Dataset.objects.create(name="Data", project=project, description="d", onedata_group_id="mgr", created_by=self.user)
+        patcher = patch("onedata_api.sync.OnezoneClient")
+        self.onezone = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        self.onezone.create_group_invite_token.side_effect = lambda group_id: f"invite-{group_id}"
+        self.onezone.list_user_groups.return_value = {"staff"}
 
-        with patch("onedata_api.sync.OnezoneClient") as mock_client:
-            client = mock_client.return_value
-            client.create_group_invite_token.return_value = "invite"
-            joined, failed = sync.join_user_groups(viewer, "user-token")
+    def test_expected_groups_deduplicated_without_empty(self):
+        self.assertEqual(sync.expected_user_group_ids(self.user), ["staff", "mgr"])
 
-        self.assertEqual(joined, ["staff"])
-        self.assertEqual(failed, [])
-        client.join_group.assert_called_once_with("user-token", "invite")
+    def test_skips_groups_user_is_in(self):
+        joined, failed = sync.join_user_groups(self.user, "user-token")
+        self.assertEqual((joined, failed), (["mgr"], []))
+        self.onezone.list_user_groups.assert_called_once_with("user-token")
+        self.onezone.join_group.assert_called_once_with("user-token", "invite-mgr")
+
+    def test_force_joins_all(self):
+        joined, failed = sync.join_user_groups(self.user, "user-token", force=True)
+        self.assertEqual((joined, failed), (["staff", "mgr"], []))
+        self.onezone.list_user_groups.assert_not_called()
+
+    def test_failure_does_not_stop_others(self):
+        error = OnedataError(403, "forbidden", "denied")
+        self.onezone.join_group.side_effect = fail_for("invite-staff", error)
+        joined, failed = sync.join_user_groups(self.user, "user-token", force=True)
+        self.assertEqual(joined, ["mgr"])
+        self.assertEqual(failed, [{"group_id": "staff", "error": str(error)}])
+
+
+@override_settings(**ONEDATA_SETTINGS, ONEDATA_AUTO_LINK_ENABLED=True, ONEDATA_IDP_TOKEN_PREFIX="einfracz:")
+class OnedataAutoLinkTests(APITestCase):
+    url = "/api/v1/profile/onedata-sync/"
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="user", password="x")
+        oidc = patch("mozilla_django_oidc.contrib.drf.OIDCAuthentication.authenticate", return_value=(self.user, BEARER))
+        self.oidc_authenticate = oidc.start()
+        self.addCleanup(oidc.stop)
+
+        # one fake Onezone for the view (whoami) and join_user_groups
+        self.onezone = MagicMock()
+        self.onezone.whoami.return_value = "od-user"
+        self.onezone.list_user_groups.return_value = {"staff"}
+        self.onezone.create_group_invite_token.side_effect = lambda group_id: f"invite-{group_id}"
+        mocks = {}
+        for target, kwargs in (
+            ("api.views.views.OnezoneClient", {"return_value": self.onezone}),
+            ("onedata_api.sync.OnezoneClient", {"return_value": self.onezone}),
+            ("api.views.views.mark_pending", {"wraps": sync.mark_pending}),
+            ("api.views.views.schedule_sync", {}),
+        ):
+            patcher = patch(target, **kwargs)
+            mocks[target] = patcher.start()
+            self.addCleanup(patcher.stop)
+        self.mark_pending = mocks["api.views.views.mark_pending"]
+        self.schedule_sync = mocks["api.views.views.schedule_sync"]
+
+        # every log record is checked for the bearer token
+        self.logs = LogCapture()
+        root = logging.getLogger()
+        self.addCleanup(root.setLevel, root.level)
+        self.addCleanup(root.removeHandler, self.logs)
+        root.addHandler(self.logs)
+        root.setLevel(logging.DEBUG)
+
+    def _post(self, auth=f"Bearer {BEARER}", data=None):
+        response = self.client.post(self.url, data or {}, format="json", HTTP_AUTHORIZATION=auth)
+        self.assertNotIn(BEARER, response.content.decode())
+        self.assertFalse([m for m in self.logs.messages if BEARER in m])
+        return response
+
+    def _profile(self):
+        self.user.userprofile.refresh_from_db()
+        return self.user.userprofile
+
+    def _create_objects(self):
+        facility = Facility.objects.create(name="Fac", abbreviation="FAC", onedata_staff_group_id="staff", created_by=self.user)
+        Project.objects.create(name="Proj", facility=facility, description="d", onedata_managers_group_id="mgr", created_by=self.user)
+
+    def _user_object_ids(self):
+        return list(PermsGroup.objects.filter(user=self.user).values_list("object_id", flat=True))
+
+    @override_settings(ONEDATA_SYNC_ENABLED=True)
+    def test_normal_poll(self):
+        link_user(self.user, "od-user")
+        self._create_objects()
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["joined_groups"], ["mgr"])
+        self.assertEqual(response.data["skipped"], False)
+        self.onezone.whoami.assert_called_once_with(ONEZONE_TOKEN)
+        self.onezone.list_user_groups.assert_called_once_with(ONEZONE_TOKEN)
+        self.onezone.create_group_invite_token.assert_called_once_with("mgr")
+        self.onezone.join_group.assert_called_once_with(ONEZONE_TOKEN, "invite-mgr")
+        self.mark_pending.assert_not_called()
+        self.schedule_sync.assert_not_called()
+        profile = self._profile()
+        self.assertIsNotNone(profile.onedata_last_sync_at)
+        self.assertEqual(profile.onedata_last_sync_error, "")
+        self.assertIsNotNone(response.data["onedata_last_sync_at"])
+
+    @override_settings(ONEDATA_IDP_TOKEN_PREFIX="x:")
+    def test_custom_prefix(self):
+        self.assertEqual(self._post().status_code, status.HTTP_200_OK)
+        self.onezone.whoami.assert_called_once_with(f"x:{BEARER}")
+
+    def test_id_change(self):
+        link_user(self.user, "old-id")
+        self._create_objects()
+        self.onezone.whoami.return_value = "new-id"
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["onedata_user_id"], "new-id")
+        self.assertEqual(self._profile().onedata_user_id, "new-id")
+        self.assertIn(f"Onedata user id changed for user {self.user.id}: old-id -> new-id", self.logs.messages)
+        object_ids = self._user_object_ids()
+        self.assertTrue(object_ids)
+        self.mark_pending.assert_called_once_with(object_ids)
+        self.schedule_sync.assert_called_once_with(object_ids)
+
+    @override_settings(ONEDATA_SYNC_ENABLED=True)
+    def test_force(self):
+        link_user(self.user, "od-user")
+        self._create_objects()
+
+        response = self._post(data={"force": True})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["joined_groups"], ["staff", "mgr"])
+        self.onezone.list_user_groups.assert_not_called()
+        self.mark_pending.assert_called_once_with(self._user_object_ids())
+        self.schedule_sync.assert_called_once_with(self._user_object_ids())
+
+    def test_lock_busy(self):
+        with patch("api.views.views.user_sync_lock", return_value=nullcontext(False)):
+            response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["skipped"], True)
+        self.assertEqual(self.onezone.method_calls, [])
+        profile = self._profile()
+        self.assertIsNone(profile.onedata_last_sync_at)
+        self.assertEqual(profile.onedata_user_id, "")
+
+    def test_onezone_rejects_token(self):
+        link_user(self.user, "stored")
+        self.onezone.whoami.side_effect = OnedataError(401, "badToken", "invalid")
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], NOT_ACCEPTED)
+        self.assertEqual(response.data["onedata_user_id"], "stored")
+        profile = self._profile()
+        self.assertEqual(profile.onedata_user_id, "stored")
+        self.assertEqual(profile.onedata_last_sync_error, NOT_ACCEPTED)
+        self.assertIsNotNone(profile.onedata_last_sync_at)
+
+    def test_onezone_unavailable(self):
+        link_user(self.user, "stored")
+        for error in (OnedataError(503, "unavailable", "down"), requests.ConnectionError("down")):
+            with self.subTest(error=error):
+                self.onezone.whoami.side_effect = error
+                response = self._post()
+                self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+                self.assertEqual(response.data["error"], UNAVAILABLE)
+                profile = self._profile()
+                self.assertEqual(profile.onedata_last_sync_error, UNAVAILABLE)
+                self.assertEqual(profile.onedata_user_id, "stored")
+
+    @override_settings(ONEDATA_SYNC_ENABLED=True)
+    def test_partial_group_failure(self):
+        self._create_objects()
+        self.onezone.list_user_groups.return_value = set()
+        error = OnedataError(403, "forbidden", "denied")
+        self.onezone.join_group.side_effect = fail_for("invite-mgr", error)
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["joined_groups"], ["staff"])
+        self.assertEqual(response.data["failed_groups"], [{"group_id": "mgr", "error": str(error)}])
+        self.assertEqual(response.data["onedata_last_sync_error"], "1 Onedata group(s) could not be joined.")
+        self.assertEqual(self._profile().onedata_last_sync_error, "1 Onedata group(s) could not be joined.")
+
+    @override_settings(ONEDATA_SYNC_ENABLED=True)
+    def test_list_user_groups_failure_joins_all(self):
+        self._create_objects()
+        self.onezone.list_user_groups.side_effect = OnedataError(500, "internalServerError", "boom")
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["joined_groups"], ["staff", "mgr"])
+
+    @override_settings(ONEDATA_AUTO_LINK_ENABLED=False)
+    def test_disabled(self):
+        link_user(self.user, "stored")
+
+        response = self._post()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["enabled"], False)
+        self.assertEqual(response.data["onedata_user_id"], "stored")
+        self.assertEqual(self.onezone.method_calls, [])
+        self.assertIsNone(self._profile().onedata_last_sync_at)
+        profile = self.client.get("/api/v1/profile/", HTTP_AUTHORIZATION=f"Bearer {BEARER}").data["results"][0]
+        self.assertEqual(profile["onedata_auto_link_enabled"], False)
+
+    def test_not_oidc(self):
+        self.oidc_authenticate.return_value = None  # like the real one for a non-Bearer header
+        _, knox_token = AuthToken.objects.create(self.user)
+        for name, auth in (("knox", f"Token {knox_token}"), ("session", "")):
+            with self.subTest(name):
+                if name == "session":
+                    self.client.force_login(self.user)
+                response = self._post(auth=auth)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.data["error"], "Onedata auto-link requires an e-infra login.")
+                self.assertEqual(self.onezone.method_calls, [])
+                self.assertIsNone(self._profile().onedata_last_sync_at)
+
+    @patch("api.views.views.join_user_groups")
+    def test_membership_mode(self, mock_join):
+        for overrides in ({"ONEDATA_SYNC_ENABLED": True, "ONEDATA_MEMBERSHIP_MODE": "direct"}, {"ONEDATA_SYNC_ENABLED": False}):
+            with override_settings(**overrides):
+                self.assertEqual(self._post().status_code, status.HTTP_200_OK)
+        mock_join.assert_not_called()
+
+    @override_settings(ONEDATA_SYNC_ENABLED=True)
+    def test_exception_text_never_leaks_token(self):
+        self._create_objects()
+        self.onezone.join_group.side_effect = requests.exceptions.InvalidHeader(f"Invalid header value {BEARER}")
+
+        response = self._post()  # checks the response and the logs for the bearer
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({f["error"] for f in response.data["failed_groups"]}, {"InvalidHeader"})
+
+    def test_profile_onedata_fields_are_read_only(self):
+        response = self.client.patch(f"/api/v1/profile/{self.user.userprofile.id}/", {
+            "onedata_user_id": "spoofed",
+            "onedata_last_sync_at": "2020-01-01T00:00:00Z",
+            "onedata_last_sync_error": "spoofed",
+            "onedata_auto_link_enabled": False,
+        }, format="json", HTTP_AUTHORIZATION=f"Bearer {BEARER}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["onedata_auto_link_enabled"], True)
+        profile = self._profile()
+        self.assertEqual((profile.onedata_user_id, profile.onedata_last_sync_at, profile.onedata_last_sync_error), ("", None, ""))
+
+
+@override_settings(**ONEDATA_SETTINGS)
+class TargetedSyncTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="owner", password="x")
+        self.client.force_authenticate(user=self.user)
+        self.facility = Facility.objects.create(name="Fac", abbreviation="FAC", created_by=self.user)
+        self.project = Project.objects.create(name="Proj", facility=self.facility, description="d", created_by=self.user)
+        self.dataset = Dataset.objects.create(name="Data", project=self.project, description="d", created_by=self.user)
+        patcher = patch("onedata_api.sync.threading.Thread")
+        self.thread = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _scheduled_ids(self):
+        self.thread.assert_called_once()
+        self.assertIs(self.thread.call_args.kwargs["target"], sync.sync_objects)
+        self.thread.return_value.start.assert_called_once()
+        return [str(i) for i in self.thread.call_args.kwargs["args"][0]]
+
+    def test_share_schedules_sync(self):
+        other = User.objects.create_user(username="other", password="x")
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.patch(f"/api/v1/projects/{self.project.id}/",
+                                         {"shares": [{"id": other.id, "perms": "viewer"}]}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._scheduled_ids(), [str(self.project.id)])
+
+    @patch("onedata_api.sync.connection")
+    @patch("onedata_api.sync.OnezoneClient")
+    def test_sync_disabled_does_nothing(self, mock_client, _):
+        sync.sync_objects([self.project.id])
+        mock_client.assert_not_called()
+
+    @patch("api.views.views.establish_dataset", return_value=("od-dataset", None))
+    @patch("api.views.views.create_public_share", return_value=(MockedShare(), None))
+    @patch("api.views.views.create_new_dataset", return_value=(MockedFolder(), None))
+    def test_dataset_create_schedules_sync(self, *_):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post("/api/v1/datasets/", {"name": "New", "description": "d", "project": str(self.project.id)}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._scheduled_ids(), [str(response.data["id"])])
+
+    @override_settings(ONEDATA_SYNC_ENABLED=True)
+    @patch("onedata_api.sync.connection")
+    @patch("onedata_api.sync._advisory_lock", return_value=nullcontext(False))
+    @patch("onedata_api.sync.OnezoneClient")
+    def test_global_lock_busy(self, mock_client, *_):
+        sync.sync_objects([self.project.id])
+        mock_client.assert_not_called()
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.onedata_sync_status, OnedataSyncState.PENDING)
+
+    @override_settings(ONEDATA_SYNC_ENABLED=True)
+    @patch("onedata_api.sync.connection")
+    @patch("onedata_api.sync._advisory_lock", return_value=nullcontext(True))
+    @patch("onedata_api.sync.OnezoneClient")
+    @patch("onedata_api.sync._run")
+    def test_only_given_ids_in_model_order(self, mock_run, *_):
+        Project.objects.create(name="Other", facility=self.facility, description="d", created_by=self.user)
+
+        sync.sync_objects([self.dataset.id, self.project.id, self.facility.id])
+
+        calls = [(c.args[1], c.args[2].id, c.args[3]) for c in mock_run.call_args_list]
+        self.assertEqual(calls, [
+            (sync.sync_facility, self.facility.id, False),
+            (sync.sync_project, self.project.id, False),
+            (sync.sync_dataset, self.dataset.id, False),
+        ])

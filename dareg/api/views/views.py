@@ -16,6 +16,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser, FileUploadParser
 from rest_framework.views import APIView
 from django.conf import settings
+from django.utils.timezone import now
 from api.models import Facility, Job, Project, Dataset, Schema, UserProfile, PermsGroup, Instrument, Experiment, WorkflowTemplate, OnedataSyncState
 from api.serializers import (
     JobSerializer,
@@ -30,13 +31,17 @@ from api.serializers import (
     InstrumentSerializer, ExperimentSerializer, DatasetResponseSerializer, TempTokenSerializer,
     ProjectResponseSerializer,
     WorkflowTemplateSerializer,
-    OnedataLinkSerializer,
-    OnedataLinkResponseSerializer,
+    # INVITE-MODE (disabled, replaced by auto-link)
+    # OnedataLinkSerializer,
+    # OnedataLinkResponseSerializer,
+    OnedataSyncRequestSerializer,
+    OnedataSyncResponseSerializer,
 )
 from ..permissions import NestedPerms, update_perms, SameUser
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -45,7 +50,7 @@ from rest_framework.decorators import action
 from onedata_api.middleware import create_new_dataset, create_public_share, establish_dataset, rename_entry, delete_entry, create_new_experiment, create_new_temp_token, get_file_metadata, verify_job, verify_workflow_template, verify_workflow_existence
 from onedata_api.acl import apply_dataset_acl
 from onedata_api.onezone import OnezoneClient, OnedataError
-from onedata_api.sync import mark_pending, join_user_groups
+from onedata_api.sync import mark_pending, join_user_groups, schedule_sync, user_sync_lock, _safe_error
 
 logger = logging.getLogger(__name__)
 
@@ -61,38 +66,122 @@ class ProfileViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         return queryset.get(user=self.request.user.id)
 
-    @extend_schema(request=OnedataLinkSerializer, responses=OnedataLinkResponseSerializer)
-    @action(detail=False, methods=['post'], url_path='onedata-link')
-    def onedata_link(self, request, *args, **kwargs):
+    # INVITE-MODE (disabled, replaced by auto-link)
+    # @extend_schema(request=OnedataLinkSerializer, responses=OnedataLinkResponseSerializer)
+    # @action(detail=False, methods=['post'], url_path='onedata-link')
+    # def onedata_link(self, request, *args, **kwargs):
+    #     """
+    #     Links the user's Onedata account using a short-lived Onedata access token.
+    #     In invite mode the token is also used to join the user's Onedata groups. The token is never stored.
+    #     """
+    #
+    #     serializer = OnedataLinkSerializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     token = serializer.validated_data["token"].strip()
+    #
+    #     try:
+    #         onedata_user_id = OnezoneClient().whoami(token)
+    #     except Exception as e:
+    #         logger.warning(f"Onedata account link failed for user {request.user.id}: {e}")
+    #         if isinstance(e, OnedataError) and e.status < 500:
+    #             return Response({"error": "The Onedata token is invalid or expired."}, status=status.HTTP_400_BAD_REQUEST)
+    #         return Response({"error": "Onedata is not available, please try again later."}, status=status.HTTP_502_BAD_GATEWAY)
+    #
+    #     UserProfile.objects.filter(user=request.user).update(onedata_user_id=onedata_user_id)
+    #     mark_pending(PermsGroup.objects.filter(user=request.user).values_list("object_id", flat=True))
+    #
+    #     joined, failed = [], []
+    #     if settings.ONEDATA_SYNC_ENABLED and settings.ONEDATA_MEMBERSHIP_MODE == "invite":
+    #         joined, failed = join_user_groups(request.user, token)
+    #
+    #     return Response(OnedataLinkResponseSerializer({
+    #         "onedata_user_id": onedata_user_id,
+    #         "joined_groups": joined,
+    #         "failed_groups": failed,
+    #     }).data)
+
+    @extend_schema(
+        request=OnedataSyncRequestSerializer,
+        responses={200: OnedataSyncResponseSerializer, 400: OnedataSyncResponseSerializer, 502: OnedataSyncResponseSerializer},
+    )
+    @action(detail=False, methods=['post'], url_path='onedata-sync')
+    def onedata_sync(self, request, *args, **kwargs):
         """
-        Links the user's Onedata account using a short-lived Onedata access token.
-        In invite mode the token is also used to join the user's Onedata groups. The token is never stored.
+        Auto-link: links the user's Onedata account using their e-infra OIDC access token
+        and joins the user's Onedata groups (invite mode). The token is never stored or logged.
         """
-        
-        serializer = OnedataLinkSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        token = serializer.validated_data["token"].strip()
 
-        try:
-            onedata_user_id = OnezoneClient().whoami(token)
-        except Exception as e:
-            logger.warning(f"Onedata account link failed for user {request.user.id}: {e}")
-            if isinstance(e, OnedataError) and e.status < 500:
-                return Response({"error": "The Onedata token is invalid or expired."}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({"error": "Onedata is not available, please try again later."}, status=status.HTTP_502_BAD_GATEWAY)
+        request_serializer = OnedataSyncRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        force = request_serializer.validated_data["force"]
+        profile = UserProfile.objects.get(user=request.user)
 
-        UserProfile.objects.filter(user=request.user).update(onedata_user_id=onedata_user_id)
-        mark_pending(PermsGroup.objects.filter(user=request.user).values_list("object_id", flat=True))
+        def respond(error=None, http_status=status.HTTP_200_OK, skipped=False, joined=(), failed=()):
+            return Response(OnedataSyncResponseSerializer({
+                "enabled": settings.ONEDATA_AUTO_LINK_ENABLED,
+                "skipped": skipped,
+                "onedata_user_id": profile.onedata_user_id,
+                "onedata_last_sync_at": profile.onedata_last_sync_at,
+                "onedata_last_sync_error": profile.onedata_last_sync_error,
+                "joined_groups": list(joined),
+                "failed_groups": list(failed),
+                "error": error,
+            }).data, status=http_status)
 
-        joined, failed = [], []
-        if settings.ONEDATA_SYNC_ENABLED and settings.ONEDATA_MEMBERSHIP_MODE == "invite":
-            joined, failed = join_user_groups(request.user, token)
+        def save_sync_result(error):
+            profile.onedata_last_sync_at = now()
+            profile.onedata_last_sync_error = error
+            UserProfile.objects.filter(id=profile.id).update(
+                onedata_last_sync_at=profile.onedata_last_sync_at, onedata_last_sync_error=error
+            )
 
-        return Response(OnedataLinkResponseSerializer({
-            "onedata_user_id": onedata_user_id,
-            "joined_groups": joined,
-            "failed_groups": failed,
-        }).data)
+        if not settings.ONEDATA_AUTO_LINK_ENABLED:
+            return respond()
+
+        token = request.auth if isinstance(request.successful_authenticator, OIDCAuthentication) else None
+        if not isinstance(token, str) or not token:
+            return respond("Onedata auto-link requires an e-infra login.", status.HTTP_400_BAD_REQUEST)
+        onezone_token = settings.ONEDATA_IDP_TOKEN_PREFIX + token
+
+        with user_sync_lock(request.user) as acquired:
+            if not acquired:
+                return respond(skipped=True)
+            profile.refresh_from_db()
+
+            try:
+                onedata_user_id = OnezoneClient().whoami(onezone_token)
+            except Exception as e:
+                logger.warning(f"Onedata auto-link failed for user {request.user.id}: {_safe_error(e)}")
+                if isinstance(e, OnedataError) and e.status < 500:
+                    error, http_status = (
+                        "Onedata did not accept your e-infra login. If you have never used Onedata, "
+                        "log in once at https://onedata.e-infra.cz and then retry.",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+                else:
+                    error, http_status = "Onedata is not available, please try again later.", status.HTTP_502_BAD_GATEWAY
+                save_sync_result(error)
+                return respond(error, http_status)
+
+            id_changed = profile.onedata_user_id != onedata_user_id
+            if id_changed:
+                if profile.onedata_user_id:
+                    logger.info(f"Onedata user id changed for user {request.user.id}: {profile.onedata_user_id} -> {onedata_user_id}")
+                profile.onedata_user_id = onedata_user_id
+                UserProfile.objects.filter(id=profile.id).update(onedata_user_id=onedata_user_id)
+
+            # an unchanged id must not re-sync everything, the UI calls this every minute
+            if id_changed or force:
+                object_ids = list(PermsGroup.objects.filter(user=request.user).values_list("object_id", flat=True))
+                mark_pending(object_ids)
+                schedule_sync(object_ids)
+
+            joined, failed = [], []
+            if settings.ONEDATA_SYNC_ENABLED and settings.ONEDATA_MEMBERSHIP_MODE == "invite":
+                joined, failed = join_user_groups(request.user, onezone_token, force=force)
+
+            save_sync_result(f"{len(failed)} Onedata group(s) could not be joined." if failed else "")
+            return respond(joined=joined, failed=failed)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -135,6 +224,9 @@ class FacilityViewSet(viewsets.ModelViewSet):
         
         else:
             return queryset
+
+    def perform_create(self, serializer):
+        schedule_sync([serializer.save().id])
     
 
 class SchemaViewSet(viewsets.ModelViewSet):
@@ -170,7 +262,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         
         if Facility.objects.get(id=self.request.data.get('facility')).perm_atleast(self.request, PermsGroup.EDITOR):
-            serializer.save()
+            schedule_sync([serializer.save().id])
         
         else:
             raise PermissionDenied({"detail": "You do not have permissions to create a new project in this facility."})
@@ -213,7 +305,7 @@ class DatasetViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         
         if Project.objects.get(id=self.request.data.get('project')).perm_atleast(self.request, PermsGroup.EDITOR):
-            serializer.save()
+            schedule_sync([serializer.save().id])
         
         else:
             raise PermissionDenied({"detail": "You do not have permissions to create a new dataset in this project."})

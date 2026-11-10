@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import User, Group
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -77,6 +78,10 @@ class ProfileSerializer(serializers.ModelSerializer):
     any_facilities = serializers.SerializerMethodField()
     any_projects = serializers.SerializerMethodField()
     any_datasets = serializers.SerializerMethodField()
+    onedata_auto_link_enabled = serializers.SerializerMethodField()
+
+    def get_onedata_auto_link_enabled(self, obj) -> bool:
+        return settings.ONEDATA_AUTO_LINK_ENABLED
 
     def get_any_facilities(self, obj):
         for x in Facility.objects.all():
@@ -98,18 +103,41 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects", "app_version", "avatar", "last_login", "default_theme", "default_lang", "onedata_user_id"]
-        read_only_fields = ["onedata_user_id"]
+        fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects", "app_version", "avatar", "last_login", "default_theme", "default_lang",
+                  "onedata_user_id", "onedata_last_sync_at", "onedata_last_sync_error", "onedata_auto_link_enabled"]
+        read_only_fields = ["onedata_user_id", "onedata_last_sync_at", "onedata_last_sync_error"]
 
 
-class OnedataLinkSerializer(serializers.Serializer):
-    token = serializers.CharField(write_only=True)
+# INVITE-MODE (disabled, replaced by auto-link)
+# class OnedataLinkSerializer(serializers.Serializer):
+#     token = serializers.CharField(write_only=True)
 
 
-class OnedataLinkResponseSerializer(serializers.Serializer):
-    onedata_user_id = serializers.CharField()
+# INVITE-MODE (disabled, replaced by auto-link)
+# class OnedataLinkResponseSerializer(serializers.Serializer):
+#     onedata_user_id = serializers.CharField()
+#     joined_groups = serializers.ListField(child=serializers.CharField())
+#     failed_groups = serializers.ListField(child=serializers.DictField())
+
+
+class OnedataSyncRequestSerializer(serializers.Serializer):
+    force = serializers.BooleanField(required=False, default=False)
+
+
+class FailedGroupSerializer(serializers.Serializer):
+    group_id = serializers.CharField()
+    error = serializers.CharField()
+
+
+class OnedataSyncResponseSerializer(serializers.Serializer):
+    enabled = serializers.BooleanField()
+    skipped = serializers.BooleanField()
+    onedata_user_id = serializers.CharField(allow_blank=True)
+    onedata_last_sync_at = serializers.DateTimeField(allow_null=True)
+    onedata_last_sync_error = serializers.CharField(allow_blank=True)
     joined_groups = serializers.ListField(child=serializers.CharField())
-    failed_groups = serializers.ListField(child=serializers.DictField())
+    failed_groups = FailedGroupSerializer(many=True)
+    error = serializers.CharField(allow_null=True)
 
 
 class GroupSerializer(serializers.ModelSerializer):

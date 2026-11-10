@@ -53,6 +53,10 @@ ONEDATA_FULL_PASS_EVERY_N = int(os.environ.get("ONEDATA_FULL_PASS_EVERY_N", 10))
 ONEDATA_MEMBERSHIP_MODE = os.environ.get("ONEDATA_MEMBERSHIP_MODE", "invite")
 # "off" | "report" (only log unused groups) | "delete" (remove them from Onedata)
 ONEDATA_ORPHAN_CLEANUP = os.environ.get("ONEDATA_ORPHAN_CLEANUP", "report")
+# Auto-link: link the user's Onedata account with their e-infra OIDC access token.
+ONEDATA_AUTO_LINK_ENABLED = os.environ.get("ONEDATA_AUTO_LINK_ENABLED", "false").lower() == "true"
+# Prefix Onezone expects in front of an IdP access token (verified: "einfracz:").
+ONEDATA_IDP_TOKEN_PREFIX = os.environ.get("ONEDATA_IDP_TOKEN_PREFIX", "einfracz:")
 
 # Application definition
 

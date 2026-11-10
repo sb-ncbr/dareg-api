@@ -268,7 +268,7 @@ def get_file_metadata(project: Project, file_id: str):
     error = None
     metadata = None
     logger.info(f"Url: {oneprovider_configuration.host}/data/{file_id}")
-    logger.info(f"Token: {oneprovider_configuration.api_key['X-Auth-Token']}")
+    logger.info("Token: [redacted]")
     try:
         file_op_api = FileOperationsApi(oneprovider_configuration)
         # metadata = file_op_api.get_file(EntryRequest(file_id), FA_ALL)
@@ -313,7 +313,7 @@ def send_job(job: Job):
     oneprovider_configuration.host = project.facility.onedata_provider_url
     logger.info(f"Creating workflow execution host: {oneprovider_configuration.host}")
     oneprovider_configuration.api_key['X-Auth-Token'] = project.facility.onedata_token
-    logger.info(f"Creating workflow execution api key: {oneprovider_configuration.api_key['X-Auth-Token'] }")
+    logger.info("Creating workflow execution api key: [redacted]")
     workflow_client = oneprovider_client.WorkflowExecutionApi(oneprovider_client.ApiClient(oneprovider_configuration))
 
     # Parse appConfig from workflow template and job, merge with job taking precedence

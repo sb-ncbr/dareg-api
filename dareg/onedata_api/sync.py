@@ -5,11 +5,12 @@ Design and verified Onedata behaviour: ONEDATA_ACCESS_CONTROL.md
 
 import logging
 import re
+import threading
 from contextlib import contextmanager
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 
 from api.models import Facility, Project, Dataset, PermsGroup, UserProfile, OnedataSyncState
@@ -19,6 +20,7 @@ from onedata_api.onezone import OnezoneClient, OnedataError, SPACE_READ_PRIVILEG
 logger = logging.getLogger(__name__)
 
 ADVISORY_LOCK_ID = 7_301_966  # arbitrary, unique for this job
+USER_SYNC_LOCK_NAMESPACE = 7_301_967  # arbitrary, first key of the per-user onedata-sync lock
 MAX_ERRORS_PER_PASS = 10
 MAX_ORPHAN_REMOVALS_PER_PASS = 20
 SYNC_MODELS = (Facility, Project, Dataset)
@@ -187,13 +189,26 @@ def _run(client: OnezoneClient, sync_fn, obj, full: bool) -> bool:
     return True
 
 
+def _service_configured() -> bool:
+    if settings.ONEDATA_SERVICE_TOKEN and settings.ONEDATA_SERVICE_USER_ID:
+        return True
+    # without the service user id the reconciler would remove the service account from its groups
+    logger.error("Onedata sync is enabled but ONEDATA_SERVICE_TOKEN or ONEDATA_SERVICE_USER_ID is not set")
+    return False
+
+
+SYNC_STEPS = (
+    (Facility, sync_facility, ()),
+    (Project, sync_project, ("facility",)),
+    (Dataset, sync_dataset, ("project__facility",)),
+)
+
+
 def sync_onedata():
     """One reconciler pass, called from the job loop when ONEDATA_SYNC_ENABLED."""
 
     global _pass_count, _orphan_removals
-    if not (settings.ONEDATA_SERVICE_TOKEN and settings.ONEDATA_SERVICE_USER_ID):
-        # without the service user id the reconciler would remove the service account from its groups
-        logger.error("Onedata sync is enabled but ONEDATA_SERVICE_TOKEN or ONEDATA_SERVICE_USER_ID is not set")
+    if not _service_configured():
         return
 
     with _advisory_lock() as acquired:
@@ -204,11 +219,7 @@ def sync_onedata():
         _orphan_removals = 0
         client = OnezoneClient()
         errors = 0
-        for model, sync_fn, related in (
-            (Facility, sync_facility, ()),
-            (Project, sync_project, ("facility",)),
-            (Dataset, sync_dataset, ("project__facility",)),
-        ):
+        for model, sync_fn, related in SYNC_STEPS:
             queryset = model.objects.select_related(*related)
             if not full:
                 queryset = queryset.filter(onedata_sync_status__in=[OnedataSyncState.PENDING, OnedataSyncState.ERROR])
@@ -218,6 +229,31 @@ def sync_onedata():
                     if errors >= MAX_ERRORS_PER_PASS:
                         logger.error("Onedata sync pass aborted after too many errors")
                         return
+
+
+def sync_objects(object_ids):
+    """Targeted pass right after a change, so new shares reach Onedata without waiting for the job loop."""
+
+    try:
+        if not settings.ONEDATA_SYNC_ENABLED or not _service_configured():
+            return
+        with _advisory_lock() as acquired:
+            # not acquired: a pass is running, the objects stay pending for the job loop
+            if not acquired:
+                return
+            client = OnezoneClient()
+            for model, sync_fn, related in SYNC_STEPS:
+                for obj in model.objects.select_related(*related).filter(id__in=object_ids):
+                    _run(client, sync_fn, obj, False)
+    finally:
+        connection.close()  # runs in its own thread
+
+
+def schedule_sync(object_ids):
+    """Runs sync_objects in a background thread once the current transaction commits."""
+
+    object_ids = list(object_ids)
+    transaction.on_commit(lambda: threading.Thread(target=sync_objects, args=(object_ids,), daemon=True).start())
 
 
 @contextmanager
@@ -235,25 +271,61 @@ def _advisory_lock():
                 cursor.execute("SELECT pg_advisory_unlock(%s)", [ADVISORY_LOCK_ID])
 
 
-def join_user_groups(user: User, user_token: str) -> tuple[list[str], list[dict]]:
-    """
-    Invite mode: joins the user to all groups they should be in, using invite tokens
-    created with the service token and consumed with the user's token (never stored).
-    """
-    
+@contextmanager
+def user_sync_lock(user: User):
+    """Non-blocking per-user lock, so parallel onedata-sync calls of one user (several tabs) do not overlap."""
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_try_advisory_lock(%s, hashtext(%s))", [USER_SYNC_LOCK_NAMESPACE, str(user.id)])
+        acquired = cursor.fetchone()[0]
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_unlock(%s, hashtext(%s))", [USER_SYNC_LOCK_NAMESPACE, str(user.id)])
+
+
+def _safe_error(e: Exception) -> str:
+    """OnedataError text holds no request headers; other exceptions (e.g. requests.InvalidHeader) might."""
+
+    return str(e) if isinstance(e, OnedataError) else type(e).__name__
+
+
+def expected_user_group_ids(user: User) -> list[str]:
+    """Onedata groups the user should be a direct member of, following their DAREG perms."""
+
     object_ids = PermsGroup.objects.filter(user=user).values_list("object_id", flat=True)
     group_ids = [
         *Facility.objects.filter(id__in=object_ids).values_list("onedata_staff_group_id", flat=True),
         *Project.objects.filter(id__in=object_ids).values_list("onedata_managers_group_id", flat=True),
         *Dataset.objects.filter(id__in=object_ids).values_list("onedata_group_id", flat=True),
     ]
+    return list(dict.fromkeys(g for g in group_ids if g))
+
+
+def join_user_groups(user: User, user_token: str, force: bool = False) -> tuple[list[str], list[dict]]:
+    """
+    Invite mode: joins the user to the groups they should be in, using invite tokens
+    created with the service token and consumed with the user's token (never stored).
+    Without force only groups the user is not a direct member of yet are joined.
+    """
+
     client = OnezoneClient()
+    group_ids = expected_user_group_ids(user)
+    if not force:
+        try:
+            current = client.list_user_groups(user_token)
+            group_ids = [g for g in group_ids if g not in current]
+        except Exception as e:
+            logger.warning(f"Failed to list Onedata groups of user {user.id}, joining all: {_safe_error(e)}")
     joined, failed = [], []
-    for group_id in dict.fromkeys(g for g in group_ids if g):
+    for group_id in group_ids:
         try:
             client.join_group(user_token, client.create_group_invite_token(group_id))
             joined.append(group_id)
         except Exception as e:
-            logger.warning(f"Failed to join user {user.id} to Onedata group {group_id}: {e}")
-            failed.append({"group_id": group_id, "error": str(e)})
+            error = _safe_error(e)
+            logger.warning(f"Failed to join user {user.id} to Onedata group {group_id}: {error}")
+            failed.append({"group_id": group_id, "error": error})
     return joined, failed

@@ -410,6 +410,8 @@ class UserProfile(BaseModel):
     default_theme = models.CharField(max_length=6, choices=THEME_CHOICES, default='light')
     default_lang = models.CharField(max_length=5, choices=LANG_CHOICES, default='en-US')
     onedata_user_id = models.CharField("Onedata user ID", max_length=64, blank=True, default="")
+    onedata_last_sync_at = models.DateTimeField(null=True, blank=True)
+    onedata_last_sync_error = models.CharField(max_length=500, blank=True, default="")
 
     @property
     def app_version(self):
