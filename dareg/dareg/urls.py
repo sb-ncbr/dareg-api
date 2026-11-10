@@ -5,6 +5,8 @@ from rest_framework import routers
 from api.views import views
 from api.views.query import GeneralSearchViewSet
 from api.views.schemas import SchemaMetadataFieldsView
+from api.views.tokens import SuperuserLoginView, SuperuserLogoutAllView
+from knox import views as knox_views
 # WorkflowTemplateViewSet is imported via views
 from onedata_api.urls import urlpatterns as onedata_router
 from datacite_api.urls import urlpatterns as datacite_router
@@ -39,7 +41,9 @@ urlpatterns = [
     path("api/v1/reservation/", views.ReservationListView.as_view(), name="reservation"),
     path("api/v1/reservation/<uuid:id>/", views.ReservationDetailView.as_view(), name="reservation"),
     path("api/v1/temp-token/<uuid:id>/", views.TempTokenAPIView.as_view(), name="temp-token"),
-    path("api/token/", include("knox.urls")),
+    path("api/token/login/", SuperuserLoginView.as_view(), name="knox_login"),
+    path("api/token/logout/", knox_views.LogoutView.as_view(), name="knox_logout"),
+    path("api/token/logoutall/", SuperuserLogoutAllView.as_view(), name="knox_logoutall"),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]

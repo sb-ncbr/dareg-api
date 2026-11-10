@@ -13,6 +13,9 @@ class ApiConfig(AppConfig):
 
     def ready(self):
         from django.conf import settings
+        from api.onboarding import validate_onedata_settings
+
+        validate_onedata_settings()
 
         job_loop_interval = getattr(settings, "JOB_LOOP_INTERVAL", 60)
         # never reconcile real Onedata from a test run (it could create real groups from test data)

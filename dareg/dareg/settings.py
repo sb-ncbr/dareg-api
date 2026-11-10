@@ -57,6 +57,8 @@ ONEDATA_ORPHAN_CLEANUP = os.environ.get("ONEDATA_ORPHAN_CLEANUP", "report")
 ONEDATA_AUTO_LINK_ENABLED = os.environ.get("ONEDATA_AUTO_LINK_ENABLED", "false").lower() == "true"
 # Prefix Onezone expects in front of an IdP access token (verified: "einfracz:").
 ONEDATA_IDP_TOKEN_PREFIX = os.environ.get("ONEDATA_IDP_TOKEN_PREFIX", "einfracz:")
+# Onboarding gate: users without a linked Onedata account can't use DAREG (needs auto-link).
+ONEDATA_REQUIRED = os.environ.get("ONEDATA_REQUIRED", "false").lower() == "true"
 
 # Application definition
 
@@ -197,9 +199,9 @@ LOGOUT_REDIRECT_URL = os.environ["OIDC_LOGOUT_REDIRECT_URL"]
 # Django REST framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "mozilla_django_oidc.contrib.drf.OIDCAuthentication",
-        "knox.auth.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        "api.authentication.GatedOIDCAuthentication",
+        "api.authentication.GatedKnoxTokenAuthentication",
+        "api.authentication.GatedSessionAuthentication",
     ],
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.

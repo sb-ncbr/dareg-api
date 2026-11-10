@@ -286,11 +286,11 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     extra = 0
     fk_name = 'user'
-    readonly_fields = ('onedata_user_id',)
+    readonly_fields = ('onedata_user_id', 'onedata_linked_at')
 
 class UserProfileAdmin(BaseModelAdmin):
     list_display = ('avatar', 'full_name', 'last_login') + BaseModelAdmin.list_display
-    readonly_fields = BaseModelAdmin.readonly_fields + ('onedata_user_id',)
+    readonly_fields = BaseModelAdmin.readonly_fields + ('onedata_user_id', 'onedata_linked_at')
 
     def avatar(self, obj):
         return format_html('<img src="{}" width="32px" style="background: #E3E3E3;padding: 1px;"/>'.format(obj.avatar))

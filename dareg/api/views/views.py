@@ -114,9 +114,10 @@ class ProfileViewSet(viewsets.ModelViewSet):
         request_serializer = OnedataSyncRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         force = request_serializer.validated_data["force"]
+        dry_run = request_serializer.validated_data["dry_run"]
         profile = UserProfile.objects.get(user=request.user)
 
-        def respond(error=None, http_status=status.HTTP_200_OK, skipped=False, joined=(), failed=()):
+        def respond(error=None, http_status=status.HTTP_200_OK, skipped=False, joined=(), failed=(), reason=None, found=""):
             return Response(OnedataSyncResponseSerializer({
                 "enabled": settings.ONEDATA_AUTO_LINK_ENABLED,
                 "skipped": skipped,
@@ -126,6 +127,8 @@ class ProfileViewSet(viewsets.ModelViewSet):
                 "joined_groups": list(joined),
                 "failed_groups": list(failed),
                 "error": error,
+                "reason": reason,
+                "found_onedata_user_id": found,
             }).data, status=http_status)
 
         def save_sync_result(error):
@@ -135,40 +138,57 @@ class ProfileViewSet(viewsets.ModelViewSet):
                 onedata_last_sync_at=profile.onedata_last_sync_at, onedata_last_sync_error=error
             )
 
-        if not settings.ONEDATA_AUTO_LINK_ENABLED:
-            return respond()
-
-        token = request.auth if isinstance(request.successful_authenticator, OIDCAuthentication) else None
-        if not isinstance(token, str) or not token:
-            return respond("Onedata auto-link requires an e-infra login.", status.HTTP_400_BAD_REQUEST)
-        onezone_token = settings.ONEDATA_IDP_TOKEN_PREFIX + token
-
-        with user_sync_lock(request.user) as acquired:
-            if not acquired:
-                return respond(skipped=True)
-            profile.refresh_from_db()
-
+        def whoami():
+            """Returns (onedata_user_id, None) or (None, (error, http_status, reason))."""
             try:
-                onedata_user_id = OnezoneClient().whoami(onezone_token)
+                return OnezoneClient().whoami(onezone_token), None
             except Exception as e:
                 logger.warning(f"Onedata auto-link failed for user {request.user.id}: {_safe_error(e)}")
                 if isinstance(e, OnedataError) and e.status < 500:
-                    error, http_status = (
+                    return None, (
                         "Onedata did not accept your e-infra login. If you have never used Onedata, "
                         "log in once at https://onedata.e-infra.cz and then retry.",
                         status.HTTP_400_BAD_REQUEST,
+                        "no_onedata_account",
                     )
-                else:
-                    error, http_status = "Onedata is not available, please try again later.", status.HTTP_502_BAD_GATEWAY
+                return None, ("Onedata is not available, please try again later.", status.HTTP_502_BAD_GATEWAY, "onedata_unavailable")
+
+        if not settings.ONEDATA_AUTO_LINK_ENABLED:
+            return respond(reason="auto_link_disabled")
+
+        token = request.auth if isinstance(request.successful_authenticator, OIDCAuthentication) else None
+        if not isinstance(token, str) or not token:
+            return respond("Onedata auto-link requires an e-infra login.", status.HTTP_400_BAD_REQUEST, reason="not_oidc")
+        onezone_token = settings.ONEDATA_IDP_TOKEN_PREFIX + token
+
+        # a dry run only checks the account: no lock and no writes
+        if dry_run:
+            onedata_user_id, failure = whoami()
+            if failure:
+                error, http_status, reason = failure
+                return respond(error, http_status, reason=reason)
+            return respond(found=onedata_user_id)
+
+        with user_sync_lock(request.user) as acquired:
+            if not acquired:
+                return respond(skipped=True, reason="busy")
+            profile.refresh_from_db()
+
+            onedata_user_id, failure = whoami()
+            if failure:
+                error, http_status, reason = failure
                 save_sync_result(error)
-                return respond(error, http_status)
+                return respond(error, http_status, reason=reason)
 
             id_changed = profile.onedata_user_id != onedata_user_id
             if id_changed:
                 if profile.onedata_user_id:
                     logger.info(f"Onedata user id changed for user {request.user.id}: {profile.onedata_user_id} -> {onedata_user_id}")
                 profile.onedata_user_id = onedata_user_id
-                UserProfile.objects.filter(id=profile.id).update(onedata_user_id=onedata_user_id)
+                profile.onedata_linked_at = now()
+                UserProfile.objects.filter(id=profile.id).update(
+                    onedata_user_id=onedata_user_id, onedata_linked_at=profile.onedata_linked_at
+                )
 
             # an unchanged id must not re-sync everything, the UI calls this every minute
             if id_changed or force:
@@ -181,7 +201,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
                 joined, failed = join_user_groups(request.user, onezone_token, force=force)
 
             save_sync_result(f"{len(failed)} Onedata group(s) could not be joined." if failed else "")
-            return respond(joined=joined, failed=failed)
+            return respond(joined=joined, failed=failed, found=onedata_user_id)
 
 
 class UserViewSet(viewsets.ModelViewSet):

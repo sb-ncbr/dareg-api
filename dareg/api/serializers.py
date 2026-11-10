@@ -7,6 +7,7 @@ from jsonschema import Draft7Validator, SchemaError
 
 from .models import Facility, Job, Project, Dataset, Schema, BaseModel, PermsGroup, UserProfile, Instrument, Experiment, \
     ExperimentStatus, WorkflowTemplate
+from .onboarding import onedata_access_allowed
 
 # Managed by the Onedata reconciler (onedata_api/sync.py), never writable through the API
 ONEDATA_SYNC_FIELDS = ["onedata_group_id", "onedata_sync_status", "onedata_sync_error", "onedata_synced_at"]
@@ -79,9 +80,21 @@ class ProfileSerializer(serializers.ModelSerializer):
     any_projects = serializers.SerializerMethodField()
     any_datasets = serializers.SerializerMethodField()
     onedata_auto_link_enabled = serializers.SerializerMethodField()
+    onedata_required = serializers.SerializerMethodField()
+    is_superuser = serializers.SerializerMethodField()
+    onedata_access_allowed = serializers.SerializerMethodField()
 
     def get_onedata_auto_link_enabled(self, obj) -> bool:
         return settings.ONEDATA_AUTO_LINK_ENABLED
+
+    def get_onedata_required(self, obj) -> bool:
+        return settings.ONEDATA_REQUIRED
+
+    def get_is_superuser(self, obj) -> bool:
+        return obj.user.is_superuser
+
+    def get_onedata_access_allowed(self, obj) -> bool:
+        return onedata_access_allowed(obj.user)
 
     def get_any_facilities(self, obj):
         for x in Facility.objects.all():
@@ -104,8 +117,9 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ["created", "default_data_rows", "any_datasets", "any_facilities", "any_projects", "app_version", "avatar", "last_login", "default_theme", "default_lang",
-                  "onedata_user_id", "onedata_last_sync_at", "onedata_last_sync_error", "onedata_auto_link_enabled"]
-        read_only_fields = ["onedata_user_id", "onedata_last_sync_at", "onedata_last_sync_error"]
+                  "onedata_user_id", "onedata_last_sync_at", "onedata_last_sync_error", "onedata_auto_link_enabled",
+                  "onedata_required", "onedata_linked_at", "is_superuser", "onedata_access_allowed"]
+        read_only_fields = ["onedata_user_id", "onedata_last_sync_at", "onedata_last_sync_error", "onedata_linked_at"]
 
 
 # INVITE-MODE (disabled, replaced by auto-link)
@@ -122,6 +136,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 class OnedataSyncRequestSerializer(serializers.Serializer):
     force = serializers.BooleanField(required=False, default=False)
+    dry_run = serializers.BooleanField(required=False, default=False)
 
 
 class FailedGroupSerializer(serializers.Serializer):
@@ -138,6 +153,11 @@ class OnedataSyncResponseSerializer(serializers.Serializer):
     joined_groups = serializers.ListField(child=serializers.CharField())
     failed_groups = FailedGroupSerializer(many=True)
     error = serializers.CharField(allow_null=True)
+    reason = serializers.ChoiceField(
+        choices=["auto_link_disabled", "not_oidc", "busy", "no_onedata_account", "onedata_unavailable"],
+        allow_null=True,
+    )
+    found_onedata_user_id = serializers.CharField(allow_blank=True)
 
 
 class GroupSerializer(serializers.ModelSerializer):
